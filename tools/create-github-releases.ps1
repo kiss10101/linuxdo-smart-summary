@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "7.6.1",
+    [string]$Version = "7.7-alpha.7",
     [switch]$All,
     [switch]$SkipVerify
 )
@@ -8,6 +8,20 @@ $ErrorActionPreference = "Stop"
 
 $repo = "kiss10101/linuxdo-smart-summary"
 $releases = @(
+    @{
+        Tag          = "v7.7-alpha.7"
+        Name         = "v7.7-alpha.7"
+        AssetPattern = "*7.7-alpha.7.user.js"
+        AssetName    = "linuxdo-smart-summary-7.7-alpha.7.user.js"
+        Prerelease   = $true
+        Body         = @"
+7.7-alpha.7 public repository privacy and supply-chain hardening preview.
+
+- Removes internal audit artifacts and replaces live forum fixture data with explicit synthetic examples.
+- Pins marked and DOMPurify to immutable versions with integrity hashes.
+- Pins GitHub Actions to commit SHAs and narrows release workflow permissions.
+"@
+    },
     @{
         Tag          = "v7.6.1"
         Name         = "v7.6.1"

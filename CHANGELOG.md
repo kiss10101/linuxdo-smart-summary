@@ -1,5 +1,11 @@
 # Changelog
 
+## 7.7-alpha.7
+
+- Publishes the first privacy-clean public repository snapshot without internal audit artifacts or live Linux.do topic snapshots.
+- Replaces linkable forum fixture data with explicit synthetic identities, topic IDs, content, and reserved-domain avatar URLs.
+- Pins marked, DOMPurify, and GitHub Actions dependencies to immutable versions, integrity hashes, or commit SHAs, and narrows release workflow permissions.
+
 ## 7.6.1
 
 - Repackages the verified `7.6` runtime as the first privacy-clean public stable release.

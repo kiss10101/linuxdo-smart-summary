@@ -80,7 +80,7 @@ function assertContains(text, fragment, label) {
 }
 
 const fixturePath = process.argv[2] || 'fixtures/summary-selection.fixture.json';
-const version = process.argv[3] || '7.6.1';
+const version = process.argv[3] || '7.7-alpha.7';
 const fixture = JSON.parse(await readFile(resolve(process.cwd(), fixturePath), 'utf8'));
 const maxChars = fixture.maxChars || 2000;
 

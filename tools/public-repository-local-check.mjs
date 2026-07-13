@@ -4,7 +4,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-function normalizeVersion(value, fallback = '7.6.1') {
+function normalizeVersion(value, fallback = '7.7-alpha.7') {
   return String(value || fallback).trim().replace(/^v/i, '');
 }
 

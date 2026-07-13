@@ -3,7 +3,7 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
-function normalizeVersion(value, fallback = '7.6.1') {
+function normalizeVersion(value, fallback = '7.7-alpha.7') {
   return String(value || fallback).trim().replace(/^v/i, '');
 }
 
