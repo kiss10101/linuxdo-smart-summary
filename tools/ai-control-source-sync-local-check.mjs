@@ -3,7 +3,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-function normalizeVersion(value, fallback = '7.7-alpha.7') {
+function normalizeVersion(value, fallback = '7.7-alpha.8') {
   return String(value || fallback).trim().replace(/^v/i, '');
 }
 

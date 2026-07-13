@@ -1,5 +1,12 @@
 # Changelog
 
+## 7.7-alpha.8
+
+- Routes AI-context HTML conversion through one inert-DOM text extraction path and removes the regex tag-stripping fallback from the active preview runtime.
+- Adds malformed-markup, unsafe-element, and single-pass nested-entity regression fixtures for HTML-to-text conversion.
+- Replaces fixed URL substring checks with parsed fixture URL policy enforcement covering hosts, HTTPS, credentials, sensitive Linux.do paths, synthetic IDs, and sensitive query keys.
+- Preserves each main post and reply `created_at` value in summary and follow-up AI context as a normalized ISO 8601 UTC timestamp, without adding Linux.do requests.
+
 ## 7.7-alpha.7
 
 - Publishes the first privacy-clean public repository snapshot without internal audit artifacts or live Linux.do topic snapshots.

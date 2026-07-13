@@ -11,14 +11,14 @@
 
 <p align="center">
   <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases/download/v7.6.1/linuxdo-smart-summary-7.6.1.user.js">安装稳定版 7.6.1</a> ·
-  <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases/download/v7.7-alpha.7/linuxdo-smart-summary-7.7-alpha.7.user.js">预览版 7.7-alpha.7</a> ·
+  <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases/download/v7.7-alpha.8/linuxdo-smart-summary-7.7-alpha.8.user.js">预览版 7.7-alpha.8</a> ·
   <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases">Releases</a> ·
   <a href="./CHANGELOG.md">更新日志</a>
 </p>
 
 <p align="center">
   <img alt="stable" src="https://img.shields.io/badge/stable-7.6.1-2563eb">
-  <img alt="preview" src="https://img.shields.io/badge/preview-7.7--alpha.7-f59e0b">
+  <img alt="preview" src="https://img.shields.io/badge/preview-7.7--alpha.8-f59e0b">
   <img alt="platform" src="https://img.shields.io/badge/platform-linux.do-16a34a">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-64748b">
 </p>
@@ -37,18 +37,18 @@ AI 总结、内容导出和后续追问。AI 服务由用户在侧边栏里配�
 | 通道 | 版本 | 适用场景 | 说明 |
 | --- | --- | --- | --- |
 | 稳定版 | `7.6.1` | 需要最稳妥的安装版本 | 以已验证的 `7.6` 运行时为基础，固定 marked/DOMPurify 依赖并使用隐私清理后的公开 fixture |
-| 预览版 | `7.7-alpha.7` | 需要隐私清理后的公开构建 | 用合成 fixture 替代真实论坛快照，并固定运行时和发版依赖，不改变 Linux.do 请求行为 |
+| 预览版 | `7.7-alpha.8` | 需要安全加固后的公开预览版 | 使用 inert DOM 转换 HTML 文本、解析后的 URL 策略约束合成 fixture，并在 AI 上下文保留发帖时间，不改变 Linux.do 请求行为 |
 
 版本线：
 
 ```text
-7.6.1 -> 7.7-alpha.7
+7.6.1 -> 7.7-alpha.7 -> 7.7-alpha.8
 ```
 
 GitHub 会把最新的非 prerelease 版本标记为 `Latest`；稳定版 `7.6.1` 仍是默认安装目标，
-`7.7-alpha.7` 是当前 prerelease 预览版。
+`7.7-alpha.8` 是当前 prerelease 预览版。
 
-公开 Git 历史从隐私清理后的 `7.6.1` 稳定基线开始，再继续到 `7.7-alpha.7`。
+公开 Git 历史从隐私清理后的 `7.6.1` 稳定基线开始，经 `7.7-alpha.7` 继续到 `7.7-alpha.8`。
 更早的开发提交和 prerelease 标签保留在私有归档中；公开仓库通过 CHANGELOG
 保留版本语义，但不导入私有历史。
 
@@ -69,6 +69,8 @@ GitHub 会把最新的非 prerelease 版本标记为 `Latest`；稳定版 `7.6.1
 | 总结选区 | 可将选中的总结文本带入后续对话，用于解释、追问、局部总结或插入输入框 |
 | 回复关系 | 保留被回复楼层信息，包括已删除或当前不可见的目标楼层 |
 | 引用归因 | 在 AI 上下文中保留引用/转发 Discourse 链接的来源用户、主题、楼层、标题和 URL |
+| HTML 转文本安全 | 通过 inert DOM 转换 cooked HTML，移除非内容嵌入节点，并在不使用正则剥标签的情况下读取纯文本 |
+| 帖子时间 | 将主贴和每条回复的 `created_at` 以 ISO 8601 UTC 写入总结/追问 AI 上下文；HTML 与 AI 文本导出继续包含帖子时间 |
 | Boosts | 从现有 Discourse JSON 载荷中读取 boosts |
 | 总结覆盖报告 | 展示请求范围、主题真实最高楼层、实际可见楼层数、缓存状态和回看校准状态 |
 | 导出 | 将明确拉取到的帖子集合导出为 HTML 或 AI 可读文本 |
@@ -123,7 +125,7 @@ topic JSON 短缓存，只用于让范围设置、总结和导出共享同一份
 
 ```bash
 node --check "dist/Linux.do 智能总结-7.6.1.user.js"
-node --check "dist/Linux.do 智能总结-7.7-alpha.7.user.js"
+node --check "dist/Linux.do 智能总结-7.7-alpha.8.user.js"
 node --check tools/range-mapping-local-check.mjs
 node --check tools/reply-relation-local-check.mjs
 node --check tools/fetch-posts-batch-local-check.mjs
@@ -135,6 +137,8 @@ node --check tools/api-profiles-local-check.mjs
 node --check tools/range-refresh-local-check.mjs
 node --check tools/summary-selection-local-check.mjs
 node --check tools/runtime-performance-local-check.mjs
+node --check tools/html-to-text-local-check.mjs
+node --check tools/post-timestamps-local-check.mjs
 node --check tools/quote-attribution-local-check.mjs
 node --check tools/boosts-local-check.mjs
 node --check tools/topic-identity-local-check.mjs
@@ -147,20 +151,22 @@ node tools/range-mapping-local-check.mjs fixtures/post-stream-gap.fixture.json
 node tools/reply-relation-local-check.mjs fixtures/reply-relation.fixture.json
 node tools/fetch-posts-batch-local-check.mjs fixtures/fetch-posts-batch.fixture.json
 node tools/summary-content-cache-local-check.mjs fixtures/summary-content-cache.fixture.json
-node tools/chat-message-actions-local-check.mjs fixtures/chat-message-actions.fixture.json 7.7-alpha.7
-node tools/ai-upstream-errors-local-check.mjs 7.7-alpha.7
-node tools/ai-control-source-sync-local-check.mjs 7.7-alpha.7
-node tools/api-profiles-local-check.mjs 7.7-alpha.7
-node tools/range-refresh-local-check.mjs 7.7-alpha.7
-node tools/summary-selection-local-check.mjs fixtures/summary-selection.fixture.json 7.7-alpha.7
-node tools/runtime-performance-local-check.mjs 7.7-alpha.7
+node tools/chat-message-actions-local-check.mjs fixtures/chat-message-actions.fixture.json 7.7-alpha.8
+node tools/ai-upstream-errors-local-check.mjs 7.7-alpha.8
+node tools/ai-control-source-sync-local-check.mjs 7.7-alpha.8
+node tools/api-profiles-local-check.mjs 7.7-alpha.8
+node tools/range-refresh-local-check.mjs 7.7-alpha.8
+node tools/summary-selection-local-check.mjs fixtures/summary-selection.fixture.json 7.7-alpha.8
+node tools/runtime-performance-local-check.mjs 7.7-alpha.8
+node tools/html-to-text-local-check.mjs fixtures/html-to-text.fixture.json 7.7-alpha.8
+node tools/post-timestamps-local-check.mjs fixtures/post-timestamps.fixture.json 7.7-alpha.8
 node tools/quote-attribution-local-check.mjs fixtures/quote-attribution.fixture.json
 node tools/boosts-local-check.mjs fixtures/boosts.fixture.json
 node tools/topic-identity-local-check.mjs fixtures/topic-identity.fixture.json
 node tools/topic-bounds-local-check.mjs fixtures/topic-bounds.fixture.json
-node tools/public-repository-local-check.mjs 7.7-alpha.7
-node tools/verify-release.mjs 7.7-alpha.7
-node tools/check-all.mjs 7.7-alpha.7
+node tools/public-repository-local-check.mjs 7.7-alpha.8
+node tools/verify-release.mjs 7.7-alpha.8
+node tools/check-all.mjs 7.7-alpha.8
 ```
 
 预期 fixture 输出：
@@ -171,18 +177,20 @@ All reply relation cases passed.
 All fetch batch cases passed.
 All summary content cache cases passed.
 All chat message action cases passed.
-AI upstream errors check passed for 7.7-alpha.7.
-AI control/source/settings sync check passed for 7.7-alpha.7.
-API profiles check passed for 7.7-alpha.7.
-Range refresh check passed for 7.7-alpha.7.
+AI upstream errors check passed for 7.7-alpha.8.
+AI control/source/settings sync check passed for 7.7-alpha.8.
+API profiles check passed for 7.7-alpha.8.
+Range refresh check passed for 7.7-alpha.8.
 All summary selection cases passed.
-Runtime performance check passed for 7.7-alpha.7.
+Runtime performance check passed for 7.7-alpha.8.
+HTML-to-text check passed for 7.7-alpha.8.
+Post timestamps check passed for 7.7-alpha.8.
 All quote attribution cases passed.
 All boost formatting cases passed.
 All topic identity cases passed.
 Topic bounds local check passed.
-Public repository check passed for 7.7-alpha.7.
-Release verification passed for 7.7-alpha.7.
+Public repository check passed for 7.7-alpha.8.
+Release verification passed for 7.7-alpha.8.
 All local checks passed.
 ```
 
@@ -190,8 +198,8 @@ All local checks passed.
 
 GitHub Release 由 `.github/workflows/release.yml` 发布。
 
-- 推送新标签，例如 `v7.7-alpha.7`，会自动触发发版。
-- 对已经存在的标签，可以在 GitHub Actions 页面手动运行 `Release` workflow，输入 `7.7-alpha.7` 来发布或修复该版本的 Release。
+- 推送新标签，例如 `v7.7-alpha.8`，会自动触发发版。
+- 对已经存在的标签，可以在 GitHub Actions 页面手动运行 `Release` workflow，输入 `7.7-alpha.8` 来发布或修复该版本的 Release。
 - 普通 `master` 推送不会发布 Release；发版任务只由标签或手动运行触发。
 - workflow 会执行 `node tools/check-all.mjs <version>`，从 `release-manifest.json` 准备重命名后的 asset，并用 GitHub Actions 自带的 `GITHUB_TOKEN` 上传。
 
@@ -203,7 +211,7 @@ Cloudflare clearance、导出的主题内容、真实用户头像、受限主题
 
 运行时配置保存在用户自己的浏览器扩展存储中。API Key 只发送到用户选择的服务商
 接口。只有用户主动触发总结或追问时，脚本才会把 Linux.do 内容发送给该服务商；
-其中可能包括当前账号有权查看的受限内容。
+其中可能包括当前账号有权查看的受限内容，以及纳入上下文的每条帖子的 `created_at` 时间戳。
 
 脚本发送的是提取后的文本以及图片/附件 URL，不会把 browser cookies 发送给 AI
 服务商，也不会下载图片二进制后再次上传。若某个 URL 无需用户浏览器登录态即可访问，

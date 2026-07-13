@@ -1,0 +1,30 @@
+{
+  "name": "HTML-to-text parsing and single-pass entity decoding",
+  "cases": [
+    {
+      "name": "markup and entities",
+      "html": "<p>第一段 &amp; <strong>second</strong></p>",
+      "expected": "第一段 & second"
+    },
+    {
+      "name": "unsafe embedded blocks are excluded",
+      "html": "<p>visible</p><script>secret()</script><style>.hidden{}</style><iframe>private</iframe><object>object text</object><embed>embed text",
+      "expected": "visible"
+    },
+    {
+      "name": "nested entities decode once",
+      "html": "<p>&amp;lt;script&amp;gt;safe&amp;lt;/script&amp;gt;</p>",
+      "expected": "&lt;script&gt;safe&lt;/script&gt;"
+    },
+    {
+      "name": "malformed markup remains readable",
+      "html": "<p>first <b>second</p> third",
+      "expected": "first second third"
+    },
+    {
+      "name": "encoded tag stays text",
+      "html": "<p>&lt;img src=x onerror=alert(1)&gt;safe</p>",
+      "expected": "<img src=x onerror=alert(1)>safe"
+    }
+  ]
+}

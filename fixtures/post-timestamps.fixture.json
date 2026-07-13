@@ -1,0 +1,52 @@
+{
+  "name": "post created_at timestamps in AI context",
+  "cases": [
+    {
+      "name": "main post keeps UTC timestamp",
+      "post": {
+        "id": 987654301,
+        "post_number": 1,
+        "name": "示例楼主",
+        "username": "example_author",
+        "created_at": "2026-07-14T03:04:05.000Z",
+        "cooked": "<p>这是合成主贴内容。</p>"
+      },
+      "expectedTimestamp": "2026-07-14T03:04:05.000Z"
+    },
+    {
+      "name": "reply normalizes offset timestamp",
+      "post": {
+        "id": 987654302,
+        "post_number": 2,
+        "name": "示例回复者",
+        "username": "example_replier",
+        "created_at": "2026-07-14T11:04:05+08:00",
+        "cooked": "<p>这是合成回复内容。</p>"
+      },
+      "expectedTimestamp": "2026-07-14T03:04:05.000Z"
+    },
+    {
+      "name": "missing timestamp stays absent",
+      "post": {
+        "id": 987654303,
+        "post_number": 3,
+        "name": "无时间示例",
+        "username": "example_missing_time",
+        "cooked": "<p>这是没有时间字段的合成内容。</p>"
+      },
+      "expectedTimestamp": ""
+    },
+    {
+      "name": "invalid timestamp stays absent",
+      "post": {
+        "id": 987654304,
+        "post_number": 4,
+        "name": "坏时间示例",
+        "username": "example_invalid_time",
+        "created_at": "not-a-date",
+        "cooked": "<p>这是无效时间字段的合成内容。</p>"
+      },
+      "expectedTimestamp": ""
+    }
+  ]
+}

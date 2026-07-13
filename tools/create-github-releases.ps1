@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "7.7-alpha.7",
+    [string]$Version = "7.7-alpha.8",
     [switch]$All,
     [switch]$SkipVerify
 )
@@ -8,6 +8,21 @@ $ErrorActionPreference = "Stop"
 
 $repo = "kiss10101/linuxdo-smart-summary"
 $releases = @(
+    @{
+        Tag          = "v7.7-alpha.8"
+        Name         = "v7.7-alpha.8"
+        AssetPattern = "*7.7-alpha.8.user.js"
+        AssetName    = "linuxdo-smart-summary-7.7-alpha.8.user.js"
+        Prerelease   = $true
+        Body         = @"
+7.7-alpha.8 HTML-to-text, timestamp, and public fixture privacy-gate hardening preview.
+
+- Routes active preview HTML-to-text conversion through inert DOM parsing instead of regex tag stripping.
+- Adds malformed HTML and nested-entity regression coverage.
+- Validates fixture URLs with parsed protocol, host, credential, synthetic-ID, path, and query policies.
+- Preserves main-post and reply created_at timestamps in summary and follow-up AI context without adding Linux.do requests.
+"@
+    },
     @{
         Tag          = "v7.7-alpha.7"
         Name         = "v7.7-alpha.7"

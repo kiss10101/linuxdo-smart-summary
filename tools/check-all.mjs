@@ -3,7 +3,7 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
-function normalizeVersion(value, fallback = '7.7-alpha.7') {
+function normalizeVersion(value, fallback = '7.7-alpha.8') {
   return String(value || fallback).trim().replace(/^v/i, '');
 }
 
@@ -32,6 +32,8 @@ const commands = [
   ['--check', 'tools/range-refresh-local-check.mjs'],
   ['--check', 'tools/summary-selection-local-check.mjs'],
   ['--check', 'tools/runtime-performance-local-check.mjs'],
+  ['--check', 'tools/html-to-text-local-check.mjs'],
+  ['--check', 'tools/post-timestamps-local-check.mjs'],
   ['--check', 'tools/quote-attribution-local-check.mjs'],
   ['--check', 'tools/boosts-local-check.mjs'],
   ['--check', 'tools/topic-identity-local-check.mjs'],
@@ -47,6 +49,8 @@ const commands = [
   ['tools/chat-message-actions-local-check.mjs', 'fixtures/chat-message-actions.fixture.json', version],
   ['tools/api-profiles-local-check.mjs', version],
   ['tools/summary-selection-local-check.mjs', 'fixtures/summary-selection.fixture.json', version],
+  ['tools/html-to-text-local-check.mjs', 'fixtures/html-to-text.fixture.json', version],
+  ['tools/post-timestamps-local-check.mjs', 'fixtures/post-timestamps.fixture.json', version],
   ...previewFeatureChecks,
   ['tools/quote-attribution-local-check.mjs', 'fixtures/quote-attribution.fixture.json'],
   ['tools/boosts-local-check.mjs', 'fixtures/boosts.fixture.json'],

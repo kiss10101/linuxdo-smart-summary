@@ -94,7 +94,7 @@ for (const testCase of fixture.cases) {
       calls.push({ url, ids });
       return {
         post_stream: {
-          posts: ids.map((id) => ({ id, post_number: id }))
+          posts: ids.map((id) => ({ id, post_number: id, created_at: '2026-07-14T03:04:05.000Z' }))
         }
       };
     }
@@ -113,6 +113,7 @@ for (const testCase of fixture.cases) {
   const totalBatches = progressEvents.at(-1)?.totalBatches;
   const totalIds = progressEvents.at(-1)?.totalIds;
   const uniqueTruthyIds = [...new Set(expandIds(testCase).filter(Boolean))];
+  const timestampsPreserved = posts.every((post) => post.created_at === '2026-07-14T03:04:05.000Z');
 
   console.log(testCase.name);
   console.log(`  batchSizes: ${JSON.stringify(batchSizes)}`);
@@ -124,7 +125,8 @@ for (const testCase of fixture.cases) {
     || !sameArray(doneIds, testCase.expectedDoneIds)
     || totalBatches !== testCase.expectedTotalBatches
     || totalIds !== uniqueTruthyIds.length
-    || posts.length !== uniqueTruthyIds.length) {
+    || posts.length !== uniqueTruthyIds.length
+    || !timestampsPreserved) {
     failed += 1;
     console.log('  result: FAIL');
   } else {
