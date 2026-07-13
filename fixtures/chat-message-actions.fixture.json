@@ -1,0 +1,132 @@
+{
+  "name": "chat message actions and empty AI output handling",
+  "baseMessages": [
+    { "role": "system", "content": "system prompt" },
+    { "role": "user", "content": "帖子内容" },
+    { "role": "assistant", "content": "初始摘要" }
+  ],
+  "aiOutputs": [
+    {
+      "name": "plain success",
+      "raw": "最终回答",
+      "expectedKind": "success",
+      "expectedContent": "最终回答",
+      "expectedThinking": ""
+    },
+    {
+      "name": "thinking plus content",
+      "raw": "<think>内部推理</think>\n最终回答",
+      "expectedKind": "success",
+      "expectedContent": "最终回答",
+      "expectedThinking": "内部推理",
+      "expectedCopyText": "最终回答"
+    },
+    {
+      "name": "closed thinking only",
+      "raw": "<thinking>只有思考</thinking>",
+      "expectedKind": "thinking_only",
+      "expectedContent": "",
+      "expectedThinkingContains": "只有思考"
+    },
+    {
+      "name": "empty whitespace",
+      "raw": "  \n\t ",
+      "expectedKind": "empty_response"
+    }
+  ],
+  "messageFlows": [
+    {
+      "name": "thinking-only pair stays visible but excluded from API",
+      "initialVisible": [],
+      "actions": [
+        { "type": "send", "userId": "u1", "assistantId": "a1", "text": "继续分析", "aiRaw": "<think>只有思考</think>" }
+      ],
+      "expectedVisibleIds": ["u1", "a1"],
+      "expectedExcludedIds": ["u1", "a1"],
+      "expectedAssistantStatus": { "a1": "error" },
+      "expectedAssistantErrorKind": { "a1": "thinking_only" },
+      "expectedDefaultApiContents": ["system prompt", "帖子内容", "初始摘要"],
+      "expectedErrorHtmlContains": ["AI 只返回了思考过程", "重新生成", "删除"]
+    },
+    {
+      "name": "regenerate failed assistant reuses excluded user once",
+      "initialVisible": [
+        { "id": "u1", "role": "user", "content": "继续分析", "status": "done", "excludeFromApi": true },
+        { "id": "a1", "role": "assistant", "content": "", "rawContent": "<think>只有思考</think>", "status": "error", "errorKind": "thinking_only", "excludeFromApi": true, "regenerateFromUserId": "u1" }
+      ],
+      "actions": [
+        { "type": "regenerate", "messageId": "a1", "assistantId": "a2", "aiRaw": "<think>计划</think>\n新的回答" }
+      ],
+      "expectedVisibleIds": ["u1", "a2"],
+      "expectedIncludedIds": ["u1", "a2"],
+      "expectedLastRequestContents": ["system prompt", "帖子内容", "初始摘要", "继续分析"],
+      "expectedAssistantContent": { "a2": "新的回答" }
+    },
+    {
+      "name": "edit middle user truncates descendants and builds edited request",
+      "initialVisible": [
+        { "id": "u1", "role": "user", "content": "问题一", "status": "done" },
+        { "id": "a1", "role": "assistant", "content": "回答一", "status": "done" },
+        { "id": "u2", "role": "user", "content": "问题二", "status": "done" },
+        { "id": "a2", "role": "assistant", "content": "回答二", "status": "done" }
+      ],
+      "actions": [
+        { "type": "edit", "messageId": "u2", "content": "问题二，已编辑" }
+      ],
+      "requestOptions": { "throughMessageId": "u2", "includeExcludedMessageId": "u2" },
+      "expectedVisibleIds": ["u1", "a1", "u2"],
+      "expectedRemovedIds": ["a2"],
+      "expectedApiContents": ["system prompt", "帖子内容", "初始摘要", "问题一", "回答一", "问题二，已编辑"]
+    },
+    {
+      "name": "delete assistant keeps user visible but excluded",
+      "initialVisible": [
+        { "id": "u1", "role": "user", "content": "问题一", "status": "done" },
+        { "id": "a1", "role": "assistant", "content": "回答一", "status": "done" },
+        { "id": "u2", "role": "user", "content": "问题二", "status": "done" }
+      ],
+      "actions": [
+        { "type": "delete", "messageId": "a1" }
+      ],
+      "expectedVisibleIds": ["u1"],
+      "expectedRemovedIds": ["a1", "u2"],
+      "expectedExcludedIds": ["u1"]
+    },
+    {
+      "name": "delete user truncates branch",
+      "initialVisible": [
+        { "id": "u1", "role": "user", "content": "问题一", "status": "done" },
+        { "id": "a1", "role": "assistant", "content": "回答一", "status": "done" },
+        { "id": "u2", "role": "user", "content": "问题二", "status": "done" }
+      ],
+      "actions": [
+        { "type": "delete", "messageId": "u1" }
+      ],
+      "expectedVisibleIds": [],
+      "expectedRemovedIds": ["u1", "a1", "u2"]
+    }
+  ],
+  "distShape": {
+    "requiredContains": [
+      "classifyAiOutput",
+      "sanitizeMessagesForApi",
+      "getMessageCopyText",
+      "renderChatErrorContent",
+      "data-chat-action=\"regenerate\"",
+      "data-chat-action=\"delete\"",
+      "data-message-menu-action=\"copy\""
+    ],
+    "requiredRegex": [
+      "contextmenu",
+      "openMessageContextMenu\\s*\\(",
+      "closeMessageContextMenu\\s*\\(",
+      "startEditMessage\\s*\\(",
+      "confirmEditMessage\\s*\\(",
+      "deleteMessage\\s*\\(",
+      "regenerateMessage\\s*\\(",
+      "requestAssistantForUser\\s*\\(",
+      "UIRegistry\\.get\\('style1'\\)\\.createEmptyChatSession",
+      "UIRegistry\\.get\\('style1'\\)\\.bindMessageContextMenu"
+    ]
+  }
+}

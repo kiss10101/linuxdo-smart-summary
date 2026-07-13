@@ -1,0 +1,23 @@
+{
+  "timelineReplies": 8,
+  "recentFloors": 5,
+  "topicData": {
+    "id": 2515491,
+    "highest_post_number": 9,
+    "posts_count": 8,
+    "reply_count": 7,
+    "post_stream": {
+      "stream": [101, 102, 104, 105, 106, 107, 108, 109],
+      "posts": [
+        { "id": 101, "post_number": 1 },
+        { "id": 102, "post_number": 2 },
+        { "id": 104, "post_number": 4 },
+        { "id": 105, "post_number": 5 },
+        { "id": 106, "post_number": 6 },
+        { "id": 107, "post_number": 7 },
+        { "id": 108, "post_number": 8 },
+        { "id": 109, "post_number": 9 }
+      ]
+    }
+  }
+}

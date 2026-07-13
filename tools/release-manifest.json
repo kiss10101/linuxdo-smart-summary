@@ -1,0 +1,13 @@
+{
+  "stable": "7.6.1",
+  "preview": null,
+  "releases": [
+    {
+      "version": "7.6.1",
+      "tag": "v7.6.1",
+      "localAsset": "dist/Linux.do 智能总结-7.6.1.user.js",
+      "uploadAsset": "linuxdo-smart-summary-7.6.1.user.js",
+      "prerelease": false
+    }
+  ]
+}

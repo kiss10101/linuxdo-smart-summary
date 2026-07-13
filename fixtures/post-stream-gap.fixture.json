@@ -1,0 +1,44 @@
+{
+  "name": "post stream with a missing floor",
+  "posts": [
+    { "id": 101, "post_number": 1 },
+    { "id": 102, "post_number": 2 },
+    { "id": 104, "post_number": 4 },
+    { "id": 105, "post_number": 5 },
+    { "id": 106, "post_number": 6 },
+    { "id": 107, "post_number": 7 },
+    { "id": 108, "post_number": 8 },
+    { "id": 109, "post_number": 9 }
+  ],
+  "policy": {
+    "step": 2,
+    "max": 4
+  },
+  "cases": [
+    {
+      "range": [3, 3],
+      "expectedPostNumbers": [],
+      "oldSlicePostNumbers": [4]
+    },
+    {
+      "range": [4, 4],
+      "expectedPostNumbers": [4],
+      "oldSlicePostNumbers": [5]
+    },
+    {
+      "range": [4, 6],
+      "expectedPostNumbers": [4, 5, 6],
+      "oldSlicePostNumbers": [5, 6, 7]
+    },
+    {
+      "range": [7, 8],
+      "expectedPostNumbers": [7, 8],
+      "oldSlicePostNumbers": [8, 9]
+    },
+    {
+      "range": [1, 2],
+      "expectedPostNumbers": [1, 2],
+      "oldSlicePostNumbers": [1, 2]
+    }
+  ]
+}

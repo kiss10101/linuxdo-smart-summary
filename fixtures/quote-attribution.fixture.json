@@ -1,0 +1,22 @@
+{
+  "name": "cross-topic discourse quote attribution",
+  "post": {
+    "post_number": 5,
+    "topic_id": 987654322,
+    "name": "示例作者",
+    "username": "example_author",
+    "cooked": "<p>这是当前示例主题中的回复内容。</p><aside class=\"quote\" data-username=\"source_author\" data-post=\"1\" data-topic=\"987654320\" data-full=\"true\" role=\"none\" data-expanded=\"false\"><div class=\"title\"><img alt=\"\" width=\"24\" height=\"24\" src=\"https://example.invalid/avatar/source_author.png\" class=\"avatar\"><a href=\"https://linux.do/t/synthetic-topic/987654320/1\">合成引用主题</a></div><blockquote id=\"quote-id-987654320-1-0\"><div class=\"post__contents-cooked-quote\"><p>这是来自另一个合成主题的引用内容。</p></div></blockquote></aside>"
+  },
+  "expectedContains": [
+    "[5楼] 示例作者（example_author）:",
+    "这是当前示例主题中的回复内容。",
+    "[跨主题引用/转发: @source_author，《合成引用主题》，topic 987654320 #1，链接 https://linux.do/t/synthetic-topic/987654320/1]",
+    "这是来自另一个合成主题的引用内容。",
+    "[/跨主题引用/转发]"
+  ],
+  "forbiddenContains": [
+    "[引用]\n这是来自另一个合成主题的引用内容。",
+    "post__contents-cooked-quote",
+    "data-topic="
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "name": "fetchPostsByIds batch policy",
+  "cases": [
+    {
+      "name": "451 unique ids are fetched as 200/200/51",
+      "topicId": "987654321",
+      "idRange": [1, 451],
+      "extraIds": [0, null, "", 20, 200],
+      "policy": { "batchSize": 200, "concurrency": 1, "batchDelayMs": 0 },
+      "expectedBatchSizes": [200, 200, 51],
+      "expectedDoneIds": [200, 400, 451],
+      "expectedTotalBatches": 3
+    },
+    {
+      "name": "400 ids are exactly two batches",
+      "topicId": "987654321",
+      "idRange": [1, 400],
+      "policy": { "batchSize": 200, "concurrency": 1, "batchDelayMs": 0 },
+      "expectedBatchSizes": [200, 200],
+      "expectedDoneIds": [200, 400],
+      "expectedTotalBatches": 2
+    },
+    {
+      "name": "199 ids stay in one batch",
+      "topicId": "987654321",
+      "idRange": [1, 199],
+      "policy": { "batchSize": 200, "concurrency": 1, "batchDelayMs": 0 },
+      "expectedBatchSizes": [199],
+      "expectedDoneIds": [199],
+      "expectedTotalBatches": 1
+    }
+  ]
+}

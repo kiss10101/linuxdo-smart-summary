@@ -1,0 +1,24 @@
+{
+  "name": "summary content cache survives AI failure",
+  "topicId": "987654321",
+  "range": [10, 12],
+  "dialogueText": "[10楼] alice（alice）:\n内容 A\n\n[11楼] bob（bob）:\n内容 B\n\n[12楼] carol（carol）:\n内容 C",
+  "rangeMapping": {
+    "start": 10,
+    "end": 12,
+    "complete": true,
+    "fallbackUsed": true,
+    "lookBehindIds": 40,
+    "candidateIdCount": 43,
+    "fetchedPostCount": 42,
+    "visiblePostCount": 3,
+    "missingCandidateIdCount": 0
+  },
+  "expectedVisiblePostCount": 3,
+  "expectedCacheFallbackUsed": true,
+  "expectedFetchDialoguesCalls": 1,
+  "expectedAiCalls": 2,
+  "expectedCacheHits": [false, true],
+  "ttlMs": 600000,
+  "maxAgeMs": 900000
+}

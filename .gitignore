@@ -1,0 +1,12 @@
+reports/
+release-assets/
+.env
+.env.*
+!.env.example
+*.local
+dist/*.user.js
+!dist/Linux.do 智能总结-7.6.1.user.js
+node_modules/
+.spec-workflow/
+*.log
+*.tmp

@@ -1,0 +1,88 @@
+{
+  "name": "reply relation with missing and visible parents",
+  "posts": [
+    {
+      "id": 2301,
+      "post_number": 23,
+      "name": "Bob",
+      "username": "bob",
+      "cooked": "visible parent"
+    },
+    {
+      "id": 2501,
+      "post_number": 25,
+      "name": "Alice",
+      "username": "alice",
+      "reply_to_post_number": 24,
+      "reply_to_user": null,
+      "cooked": "reply to a deleted or invisible parent"
+    },
+    {
+      "id": 2601,
+      "post_number": 26,
+      "name": "Carol",
+      "username": "carol",
+      "reply_to_post_number": 23,
+      "reply_to_user": {
+        "name": "Bob",
+        "username": "bob"
+      },
+      "cooked": "reply with serialized user"
+    },
+    {
+      "id": 2701,
+      "post_number": 27,
+      "name": "Dave",
+      "username": "dave",
+      "reply_to_post_number": 25,
+      "reply_to_user": null,
+      "cooked": "reply to a visible post in the selected range"
+    },
+    {
+      "id": 2801,
+      "post_number": 28,
+      "name": "Erin",
+      "username": "erin",
+      "reply_to_post_number": 22,
+      "reply_to_user": {},
+      "cooked": "reply with empty serialized user"
+    }
+  ],
+  "cases": [
+    {
+      "postNumber": 23,
+      "expectedInline": "",
+      "expectedLine": "",
+      "expectedAiTextHeader": "[23楼] Bob（@bob）",
+      "expectedHtmlContains": ""
+    },
+    {
+      "postNumber": 25,
+      "expectedInline": "-回复[24楼]（原帖已删除或不可见）",
+      "expectedLine": "回复: [24楼]（原帖已删除或不可见）",
+      "expectedAiTextHeader": "[25楼] Alice（@alice）-回复[24楼]（原帖已删除或不可见）",
+      "expectedHtmlContains": "回复 #24（原帖已删除或不可见）"
+    },
+    {
+      "postNumber": 26,
+      "expectedInline": "-回复[23楼] Bob（bob）",
+      "expectedLine": "回复: [23楼] Bob（@bob）",
+      "expectedAiTextHeader": "[26楼] Carol（@carol）-回复[23楼] Bob（bob）",
+      "expectedHtmlContains": "href=\"#post-23\""
+    },
+    {
+      "postNumber": 27,
+      "expectedInline": "-回复[25楼] Alice（alice）",
+      "expectedLine": "回复: [25楼] Alice（@alice）",
+      "expectedAiTextHeader": "[27楼] Dave（@dave）-回复[25楼] Alice（alice）",
+      "expectedHtmlContains": "href=\"#post-25\""
+    },
+    {
+      "postNumber": 28,
+      "expectedInline": "-回复[22楼]（原帖已删除或不可见）",
+      "expectedLine": "回复: [22楼]（原帖已删除或不可见）",
+      "expectedAiTextHeader": "[28楼] Erin（@erin）-回复[22楼]（原帖已删除或不可见）",
+      "expectedHtmlContains": "回复 #22（原帖已删除或不可见）"
+    }
+  ]
+}

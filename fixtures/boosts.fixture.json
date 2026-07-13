@@ -1,0 +1,48 @@
+{
+  "name": "boost formatting fixture",
+  "posts": [
+    {
+      "post_number": 1,
+      "name": "Alice",
+      "username": "alice",
+      "cooked": "<p>Hello</p>",
+      "boosts": [
+        {
+          "id": 101,
+          "cooked": "<p>Useful detail <strong>here</strong>.</p>",
+          "user": {
+            "name": "Bob",
+            "username": "bob"
+          }
+        },
+        {
+          "id": 102,
+          "cooked": "<img src=x onerror=alert(1)><script>alert(2)</script>Nice",
+          "user": {
+            "username": "mallory"
+          }
+        }
+      ]
+    },
+    {
+      "post_number": 2,
+      "name": "No Boost",
+      "username": "noboost",
+      "cooked": "<p>No boosts here</p>",
+      "boosts": []
+    }
+  ],
+  "cases": [
+    {
+      "postNumber": 1,
+      "expectedTextContains": ["Boosts: 2 条", "Bob（bob）", "Useful detail here.", "mallory"],
+      "expectedHtmlContains": ["Boosts · 2", "@bob", "Useful detail here.", "@mallory"],
+      "forbiddenHtmlContains": ["<script>", "onerror=", "<img"]
+    },
+    {
+      "postNumber": 2,
+      "expectedText": "",
+      "expectedHtml": ""
+    }
+  ]
+}

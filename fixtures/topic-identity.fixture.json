@@ -1,0 +1,56 @@
+{
+  "name": "Linux.do topic route identity parsing",
+  "cases": [
+    {
+      "url": "https://linux.do/topic/12345",
+      "expectedTopicId": "12345",
+      "expectedRoute": "topic-legacy"
+    },
+    {
+      "url": "https://linux.do/topic/12345?foo=bar#x",
+      "expectedTopicId": "12345",
+      "expectedRoute": "topic-legacy"
+    },
+    {
+      "url": "https://linux.do/t/synthetic-topic/987654321",
+      "expectedTopicId": "987654321",
+      "expectedRoute": "topic-slug"
+    },
+    {
+      "url": "https://linux.do/t/987654321",
+      "expectedTopicId": "987654321",
+      "expectedRoute": "topic-slug"
+    },
+    {
+      "url": "https://linux.do/t/%E5%90%88%E6%88%90-slug/987654321/88",
+      "expectedTopicId": "987654321",
+      "expectedRoute": "topic-slug"
+    },
+    {
+      "url": "https://linux.do/t/-/987654321.json",
+      "expectedTopicId": "987654321",
+      "expectedRoute": "topic-json"
+    },
+    {
+      "url": "https://linux.do/t/-/987654321.json?include_suggested=false",
+      "expectedTopicId": "987654321",
+      "expectedRoute": "topic-json"
+    },
+    {
+      "url": "https://linux.do/latest",
+      "expectedTopicId": null
+    },
+    {
+      "url": "https://linux.do/u/example",
+      "expectedTopicId": null
+    },
+    {
+      "url": "https://linux.do/t/slug/not-number",
+      "expectedTopicId": null
+    },
+    {
+      "url": "https://linux.do/t/123/posts.json",
+      "expectedTopicId": null
+    }
+  ]
+}

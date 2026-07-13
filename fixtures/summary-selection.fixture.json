@@ -1,0 +1,126 @@
+{
+  "name": "summary selection quick actions",
+  "maxChars": 200,
+  "textCases": [
+    {
+      "name": "short chinese selection is useful",
+      "text": "这是一个有效选区",
+      "expectedUseful": true
+    },
+    {
+      "name": "single chinese character is useful",
+      "text": "佬",
+      "expectedUseful": true
+    },
+    {
+      "name": "short latin acronym is useful",
+      "text": "AI",
+      "expectedUseful": true
+    },
+    {
+      "name": "short infra acronym is useful",
+      "text": "CF",
+      "expectedUseful": true
+    },
+    {
+      "name": "short floor reference is useful",
+      "text": "7楼",
+      "expectedUseful": true
+    },
+    {
+      "name": "short punctuation is ignored",
+      "text": "，。",
+      "expectedUseful": false
+    },
+    {
+      "name": "symbol only selection is ignored",
+      "text": "→ / #",
+      "expectedUseful": false
+    },
+    {
+      "name": "emoji only selection is ignored",
+      "text": "😀",
+      "expectedUseful": false
+    },
+    {
+      "name": "whitespace is normalized",
+      "text": "第一段\n\n    第二段\t第三段",
+      "expectedText": "第一段 第二段 第三段",
+      "expectedUseful": true
+    },
+    {
+      "name": "long selection is truncated",
+      "text": "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz",
+      "expectedUseful": true,
+      "expectedTruncated": true
+    }
+  ],
+  "promptCases": [
+    {
+      "name": "explain sends immediately",
+      "action": "explain",
+      "text": "这段涉及楼层争议和主要结论",
+      "expectedAutoSend": true,
+      "expectedContains": ["请解释下面这段总结内容", "原帖讨论", "不要编造", "这段涉及楼层争议和主要结论"]
+    },
+    {
+      "name": "summarize sends immediately",
+      "action": "summarize",
+      "text": "这段内容需要进一步压缩总结",
+      "expectedAutoSend": true,
+      "expectedContains": ["进一步压缩总结", "提炼核心观点", "这段内容需要进一步压缩总结"]
+    },
+    {
+      "name": "ask fills draft",
+      "action": "ask",
+      "text": "我想继续问这个片段",
+      "expectedAutoSend": false,
+      "expectedContains": ["我想基于下面这段内容继续提问", "我的问题是：", "我想继续问这个片段"]
+    },
+    {
+      "name": "insert fills draft",
+      "action": "insert",
+      "text": "只带入不自动发送",
+      "expectedAutoSend": false,
+      "expectedContains": ["选中的总结片段", "请基于这段内容回答", "只带入不自动发送"]
+    },
+    {
+      "name": "unknown action falls back to insert",
+      "action": "unknown",
+      "text": "未知动作应走带入",
+      "expectedAction": "insert",
+      "expectedAutoSend": false,
+      "expectedContains": ["选中的总结片段", "未知动作应走带入"]
+    }
+  ],
+  "distShape": {
+    "requiredContains": [
+      "getSummarySelectionMenuHtml",
+      "bindSummarySelectionMenu",
+      "getSummarySelectionState",
+      "handleSummarySelectionAction",
+      "fillChatInputWithSelectionPrompt",
+      "summarySelectionOpenTimerId",
+      "summarySelectionRequestSeq",
+      "clearCurrentSelection",
+      "data-summary-selection-action=\"explain\"",
+      "data-summary-selection-action=\"ask\"",
+      "data-summary-selection-action=\"summarize\"",
+      "data-summary-selection-action=\"insert\"",
+      "summary-selection-menu",
+      "meaningful.length > 0",
+      "const hasDraft = !!input?.value.trim()",
+      "this.clearManagedTimeout(this.summarySelectionOpenTimerId)",
+      "this.clearCurrentSelection();",
+      "UIRegistry.get('style1').bindSummarySelectionMenu",
+      "clearCurrentSelection: UIRegistry.get('style1').clearCurrentSelection"
+    ],
+    "requiredRegex": [
+      "shadow\\?\\.getSelection\\?\\.\\(\\) \\|\\| window\\.getSelection\\?\\.\\(\\)",
+      "requestSeq !== this\\.summarySelectionRequestSeq",
+      "this\\.switchTab\\('chat'\\)",
+      "if \\(isStreaming\\) this\\.closeSummarySelectionMenu\\?\\.\\(\\)",
+      "Core\\.buildSummarySelectionPrompt\\(action, selection\\.text\\)"
+    ]
+  }
+}
