@@ -2,62 +2,14 @@
 
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { loadUserscriptCore } from './userscript-core-test-helper.mjs';
 
-function parseThinkingContent(text) {
-  const raw = String(text || '');
-  const patterns = [
-    { open: '<think>', close: '</think>' },
-    { open: '<thinking>', close: '</thinking>' }
-  ];
-  let mainContent = raw;
-  const thinkingParts = [];
-
-  for (const { open, close } of patterns) {
-    let searchFrom = 0;
-    while (searchFrom < mainContent.length) {
-      const start = mainContent.indexOf(open, searchFrom);
-      if (start === -1) break;
-      const end = mainContent.indexOf(close, start + open.length);
-      if (end === -1) {
-        thinkingParts.push(mainContent.slice(start + open.length).trim());
-        mainContent = mainContent.slice(0, start);
-        break;
-      }
-      thinkingParts.push(mainContent.slice(start + open.length, end).trim());
-      mainContent = mainContent.slice(0, start) + mainContent.slice(end + close.length);
-      searchFrom = start;
-    }
-  }
-
-  return {
-    thinking: thinkingParts.filter(Boolean).join('\n\n'),
-    content: mainContent.trim()
-  };
-}
-
-function classifyAiOutput(rawText) {
-  const raw = String(rawText ?? '');
-  const parsed = parseThinkingContent(raw);
-  const thinking = parsed.thinking.trim();
-  const content = parsed.content.trim();
-  if (content) return { kind: 'success', rawText: raw, thinking, content };
-  if (thinking) return { kind: 'thinking_only', rawText: raw, thinking, content: '' };
-  return { kind: 'empty_response', rawText: raw, thinking: '', content: '' };
-}
-
-function toOpenAiMessage(message) {
-  const role = message?.role === 'ai' ? 'assistant' : message?.role;
-  if (!['system', 'user', 'assistant'].includes(role)) return null;
-  const content = String(message?.content ?? '');
-  if (!content.trim()) return null;
-  return { role, content };
-}
-
-function sanitizeMessagesForApi(messages) {
-  return (Array.isArray(messages) ? messages : [])
-    .map(toOpenAiMessage)
-    .filter(Boolean);
-}
+const fixturePath = process.argv[2] || 'fixtures/chat-message-actions.fixture.json';
+const version = process.argv[3] || '7.7-alpha.9';
+const fixture = JSON.parse(await readFile(resolve(process.cwd(), fixturePath), 'utf8'));
+const distPath = resolve(process.cwd(), `dist/Linux.do 智能总结-${version}.user.js`);
+const distText = await readFile(distPath, 'utf8');
+const { Core } = loadUserscriptCore(distText);
 
 function createVisibleMessage(message) {
   return {
@@ -65,6 +17,7 @@ function createVisibleMessage(message) {
     role: message.role,
     content: String(message.content ?? ''),
     rawContent: String(message.rawContent ?? message.content ?? ''),
+    outputState: message.outputState ? Core.createAiOutputState(message.outputState) : null,
     status: message.status || 'done',
     errorKind: message.errorKind || null,
     errorMessage: message.errorMessage || '',
@@ -130,12 +83,12 @@ function getVisibleMessagesForApi(state, options = {}) {
 
   return messages
     .filter((message) => !message.excludeFromApi || message.id === includeExcludedMessageId)
-    .map(toOpenAiMessage)
+    .map((message) => Core.toOpenAiMessage(message))
     .filter(Boolean);
 }
 
 function buildChatApiMessages(state, options = {}) {
-  return sanitizeMessagesForApi([
+  return Core.sanitizeMessagesForApi([
     ...state.baseMessages,
     ...getVisibleMessagesForApi(state, options)
   ]);
@@ -143,7 +96,7 @@ function buildChatApiMessages(state, options = {}) {
 
 function renderChatErrorContent(message) {
   const title = message.errorKind === 'thinking_only'
-    ? 'AI 只返回了思考过程'
+    ? 'AI 只返回了推理内容'
     : message.errorKind === 'empty_response'
       ? 'AI 返回了空内容'
       : 'AI 回复失败';
@@ -156,8 +109,11 @@ function finishAssistantTurn(state, userMessage, assistantMessage, aiRaw) {
     includeExcludedMessageId: userMessage.id
   }).map((message) => message.content);
 
-  const classified = classifyAiOutput(aiRaw);
+  const outputState = Core.normalizeAiOutputState(aiRaw);
+  Core.finishAiOutputState(outputState, { finishReason: null });
+  const classified = Core.classifyAiOutput(outputState);
   assistantMessage.rawContent = String(aiRaw ?? '');
+  assistantMessage.outputState = outputState;
   assistantMessage.regenerateFromUserId = userMessage.id;
 
   if (classified.kind === 'success') {
@@ -263,20 +219,15 @@ function assertContains(text, fragment, label) {
 function getCopyText(message) {
   if (!message) return '';
   if (message.role === 'assistant') {
-    const parsed = parseThinkingContent(message.rawContent || message.content);
-    return parsed.content || message.content || '';
+    return message.outputState?.contentText || message.content || '';
   }
   return message.content || '';
 }
 
-const fixturePath = process.argv[2] || 'fixtures/chat-message-actions.fixture.json';
-const version = process.argv[3] || '7.5-alpha.4';
-const fixture = JSON.parse(await readFile(resolve(process.cwd(), fixturePath), 'utf8'));
-
 console.log(`Fixture: ${fixture.name || fixturePath}`);
 
 for (const testCase of fixture.aiOutputs || []) {
-  const classified = classifyAiOutput(testCase.raw);
+  const classified = Core.classifyAiOutput(testCase.raw);
   console.log(`aiOutput: ${testCase.name} -> ${classified.kind}`);
   assertEqual(classified.kind, testCase.expectedKind, `${testCase.name}: kind`);
   if ('expectedContent' in testCase) assertEqual(classified.content, testCase.expectedContent, `${testCase.name}: content`);
@@ -286,7 +237,8 @@ for (const testCase of fixture.aiOutputs || []) {
     const copyText = getCopyText({
       role: 'assistant',
       content: classified.content,
-      rawContent: testCase.raw
+      rawContent: testCase.raw,
+      outputState: Core.normalizeAiOutputState(testCase.raw)
     });
     assertEqual(copyText, testCase.expectedCopyText, `${testCase.name}: copy text`);
   }
@@ -339,8 +291,6 @@ for (const flow of fixture.messageFlows || []) {
   }
 }
 
-const distPath = resolve(process.cwd(), `dist/Linux.do 智能总结-${version}.user.js`);
-const distText = await readFile(distPath, 'utf8');
 for (const fragment of fixture.distShape?.requiredContains || []) {
   assertContains(distText, fragment, `dist contains ${fragment}`);
 }

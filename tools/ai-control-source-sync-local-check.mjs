@@ -3,7 +3,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-function normalizeVersion(value, fallback = '7.7-alpha.8') {
+function normalizeVersion(value, fallback = '7.7-alpha.9') {
   return String(value || fallback).trim().replace(/^v/i, '');
 }
 
@@ -58,7 +58,7 @@ if (version === '7.7-alpha.3') {
 
 const streamBlock = getBlock(
   distText,
-  /async streamChat\(messages, onChunk, onDone, onError, options = \{\}\)\s*\{/,
+  /async streamChat\(messages, onOutputEvent, onDone, onError, options = \{\}\)\s*\{/,
   /\n\s*buildModelsUrl\(apiUrl\)\s*\{/,
   'streamChat block'
 );
@@ -100,7 +100,7 @@ const summaryBlock = getBlock(
 assertContains(summaryBlock, "this.startAiAbortController('summary')", 'summary starts AI-only abort controller');
 assertContains(summaryBlock, '{ operation: \'summary\', signal: abortController.signal }', 'summary passes signal only to streamChat');
 assertContains(summaryBlock, 'sourceConfig: meta.sourceConfig', 'summary model-output errors use source snapshot');
-assertContains(summaryBlock, 'this.updateResultBox(resultBox, aiText, false, coverageReport, sourceConfig)', 'summary success renders source snapshot');
+assertContains(summaryBlock, 'this.updateResultBox(resultBox, outputState, false, coverageReport, sourceConfig)', 'summary success renders source snapshot');
 assertContains(summaryBlock, 'sourceConfig', 'summary stores source snapshot');
 assertNotContains(summaryBlock, 'Core.getActiveApiProfile()', 'summary result attribution must not read current active profile');
 

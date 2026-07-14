@@ -11,14 +11,14 @@
 
 <p align="center">
   <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases/download/v7.6.1/linuxdo-smart-summary-7.6.1.user.js">Install stable 7.6.1</a> ·
-  <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases/download/v7.7-alpha.8/linuxdo-smart-summary-7.7-alpha.8.user.js">Preview 7.7-alpha.8</a> ·
+  <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases/download/v7.7-alpha.9/linuxdo-smart-summary-7.7-alpha.9.user.js">Preview 7.7-alpha.9</a> ·
   <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases">Releases</a> ·
   <a href="./CHANGELOG.md">Changelog</a>
 </p>
 
 <p align="center">
   <img alt="stable" src="https://img.shields.io/badge/stable-7.6.1-2563eb">
-  <img alt="preview" src="https://img.shields.io/badge/preview-7.7--alpha.8-f59e0b">
+  <img alt="preview" src="https://img.shields.io/badge/preview-7.7--alpha.9-f59e0b">
   <img alt="platform" src="https://img.shields.io/badge/platform-linux.do-16a34a">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-64748b">
 </p>
@@ -38,19 +38,19 @@ data under `fixtures/`.
 | Channel | Version | Use when | Notes |
 | --- | --- | --- | --- |
 | Stable | `7.6.1` | You want the safest install target | Repackages the verified `7.6` runtime with pinned marked/DOMPurify dependencies and privacy-clean public fixtures |
-| Preview | `7.7-alpha.8` | You want the security-hardened public preview | Uses inert-DOM HTML-to-text conversion, parsed synthetic-fixture URL policies, and post timestamps in AI context without changing Linux.do request behavior |
+| Preview | `7.7-alpha.9` | You want the latest public preview | Separates provider-returned reasoning from answers, adds an accessible reasoning panel, preserves partial output, and applies stricter reasoning-content rendering without changing Linux.do request behavior |
 
 Release line:
 
 ```text
-7.6.1 -> 7.7-alpha.7 -> 7.7-alpha.8
+7.6.1 -> 7.7-alpha.7 -> 7.7-alpha.8 -> 7.7-alpha.9
 ```
 
 GitHub marks the latest non-prerelease as `Latest`; stable `7.6.1` remains the
-default install target while `7.7-alpha.8` is the current prerelease preview.
+default install target while `7.7-alpha.9` is the current prerelease preview.
 
 The public Git history starts from a privacy-clean `7.6.1` stable baseline and
-continues through `7.7-alpha.7` to `7.7-alpha.8`. Earlier development commits and prerelease
+continues through `7.7-alpha.7`, `7.7-alpha.8`, and `7.7-alpha.9`. Earlier development commits and prerelease
 tags remain in the private archive; their release semantics are retained here
 in the changelog without importing the private history.
 
@@ -64,7 +64,8 @@ in the changelog without importing the private history.
 | Runtime scheduling | Coalesces streaming Markdown renders and throttles high-frequency drag/scroll handlers |
 | Topic-page bootstrap | Creates the sidebar only on Linux.do topic routes, with a lightweight SPA route watcher elsewhere |
 | AI retry path | Reuses current-tab summary text after AI empty/error responses |
-| Follow-up chat | Keeps UI metadata out of API payloads, treats AI empty/thinking-only replies as recoverable errors, and supports right-click copy/edit/regenerate/delete |
+| Follow-up chat | Keeps UI metadata and service-returned reasoning out of API payloads, treats empty/reasoning-only replies as recoverable errors, and supports right-click copy/edit/regenerate/delete |
+| Reasoning display | Keeps structured provider reasoning separate from answer text, supports conservative response-leading tag compatibility, uses an accessible collapsible panel, and preserves partial output on stop, filtering, length limits, or upstream failure |
 | Upstream error diagnostics | Shows HTTP status, provider error code/type, non-JSON response hints, SSE error frames, and `finish_reason` explanations without exposing API keys |
 | AI control and source | Stops only the active AI provider request, keeps Linux.do fetches uncancelled, and displays the API profile snapshot used by each AI request |
 | Settings sync | Applies remote Tampermonkey setting changes to the current tab's settings UI and chat prompt memory without triggering topic, range, summary, export, or model-list requests |
@@ -129,13 +130,14 @@ Run from the repository root:
 
 ```bash
 node --check "dist/Linux.do 智能总结-7.6.1.user.js"
-node --check "dist/Linux.do 智能总结-7.7-alpha.8.user.js"
+node --check "dist/Linux.do 智能总结-7.7-alpha.9.user.js"
 node --check tools/range-mapping-local-check.mjs
 node --check tools/reply-relation-local-check.mjs
 node --check tools/fetch-posts-batch-local-check.mjs
 node --check tools/summary-content-cache-local-check.mjs
 node --check tools/chat-message-actions-local-check.mjs
 node --check tools/ai-upstream-errors-local-check.mjs
+node --check tools/reasoning-output-local-check.mjs
 node --check tools/ai-control-source-sync-local-check.mjs
 node --check tools/api-profiles-local-check.mjs
 node --check tools/range-refresh-local-check.mjs
@@ -155,22 +157,23 @@ node tools/range-mapping-local-check.mjs fixtures/post-stream-gap.fixture.json
 node tools/reply-relation-local-check.mjs fixtures/reply-relation.fixture.json
 node tools/fetch-posts-batch-local-check.mjs fixtures/fetch-posts-batch.fixture.json
 node tools/summary-content-cache-local-check.mjs fixtures/summary-content-cache.fixture.json
-node tools/chat-message-actions-local-check.mjs fixtures/chat-message-actions.fixture.json 7.7-alpha.8
-node tools/ai-upstream-errors-local-check.mjs 7.7-alpha.8
-node tools/ai-control-source-sync-local-check.mjs 7.7-alpha.8
-node tools/api-profiles-local-check.mjs 7.7-alpha.8
-node tools/range-refresh-local-check.mjs 7.7-alpha.8
-node tools/summary-selection-local-check.mjs fixtures/summary-selection.fixture.json 7.7-alpha.8
-node tools/runtime-performance-local-check.mjs 7.7-alpha.8
-node tools/html-to-text-local-check.mjs fixtures/html-to-text.fixture.json 7.7-alpha.8
-node tools/post-timestamps-local-check.mjs fixtures/post-timestamps.fixture.json 7.7-alpha.8
+node tools/chat-message-actions-local-check.mjs fixtures/chat-message-actions.fixture.json 7.7-alpha.9
+node tools/ai-upstream-errors-local-check.mjs 7.7-alpha.9
+node tools/reasoning-output-local-check.mjs fixtures/reasoning-output.fixture.json 7.7-alpha.9
+node tools/ai-control-source-sync-local-check.mjs 7.7-alpha.9
+node tools/api-profiles-local-check.mjs 7.7-alpha.9
+node tools/range-refresh-local-check.mjs 7.7-alpha.9
+node tools/summary-selection-local-check.mjs fixtures/summary-selection.fixture.json 7.7-alpha.9
+node tools/runtime-performance-local-check.mjs 7.7-alpha.9
+node tools/html-to-text-local-check.mjs fixtures/html-to-text.fixture.json 7.7-alpha.9
+node tools/post-timestamps-local-check.mjs fixtures/post-timestamps.fixture.json 7.7-alpha.9
 node tools/quote-attribution-local-check.mjs fixtures/quote-attribution.fixture.json
 node tools/boosts-local-check.mjs fixtures/boosts.fixture.json
 node tools/topic-identity-local-check.mjs fixtures/topic-identity.fixture.json
 node tools/topic-bounds-local-check.mjs fixtures/topic-bounds.fixture.json
-node tools/public-repository-local-check.mjs 7.7-alpha.8
-node tools/verify-release.mjs 7.7-alpha.8
-node tools/check-all.mjs 7.7-alpha.8
+node tools/public-repository-local-check.mjs 7.7-alpha.9
+node tools/verify-release.mjs 7.7-alpha.9
+node tools/check-all.mjs 7.7-alpha.9
 ```
 
 Expected fixture output:
@@ -181,20 +184,21 @@ All reply relation cases passed.
 All fetch batch cases passed.
 All summary content cache cases passed.
 All chat message action cases passed.
-AI upstream errors check passed for 7.7-alpha.8.
-AI control/source/settings sync check passed for 7.7-alpha.8.
-API profiles check passed for 7.7-alpha.8.
-Range refresh check passed for 7.7-alpha.8.
+AI upstream errors check passed for 7.7-alpha.9.
+Reasoning output check passed for 7.7-alpha.9.
+AI control/source/settings sync check passed for 7.7-alpha.9.
+API profiles check passed for 7.7-alpha.9.
+Range refresh check passed for 7.7-alpha.9.
 All summary selection cases passed.
-Runtime performance check passed for 7.7-alpha.8.
-HTML-to-text check passed for 7.7-alpha.8.
-Post timestamps check passed for 7.7-alpha.8.
+Runtime performance check passed for 7.7-alpha.9.
+HTML-to-text check passed for 7.7-alpha.9.
+Post timestamps check passed for 7.7-alpha.9.
 All quote attribution cases passed.
 All boost formatting cases passed.
 All topic identity cases passed.
 Topic bounds local check passed.
-Public repository check passed for 7.7-alpha.8.
-Release verification passed for 7.7-alpha.8.
+Public repository check passed for 7.7-alpha.9.
+Release verification passed for 7.7-alpha.9.
 All local checks passed.
 ```
 
@@ -202,8 +206,8 @@ All local checks passed.
 
 GitHub Releases are published by `.github/workflows/release.yml`.
 
-- Push a new tag like `v7.7-alpha.8` to trigger an automatic release.
-- Use the manual `Release` workflow with input `7.7-alpha.8` to publish or repair an existing tag release.
+- Push a new tag like `v7.7-alpha.9` to trigger an automatic release.
+- Use the manual `Release` workflow with input `7.7-alpha.9` to publish or repair an existing tag release.
 - A normal `master` push does not publish a release; the release job is tag/manual only.
 - The workflow runs `node tools/check-all.mjs <version>`, prepares a renamed asset from `release-manifest.json`, and uploads it with GitHub Actions' `GITHUB_TOKEN`.
 
@@ -224,6 +228,13 @@ The userscript sends extracted text and image or attachment URLs. It does not
 send browser cookies to the AI provider and does not download and re-upload
 image binaries. A provider may independently fetch a URL when that URL is
 reachable without the user's browser session.
+
+Provider-returned reasoning and answer fields are treated as untrusted model
+output. Reasoning is escaped as plain text while streaming and is strictly
+sanitized before completed Markdown rendering; remote media and active embedded
+content are forbidden in the reasoning panel. UI labels call this
+service-returned reasoning or a reasoning summary and do not claim that it is a
+model's complete or authentic private chain of thought.
 
 See `SECURITY.md` for private vulnerability reporting and repository data rules.
 

@@ -3,7 +3,7 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
-function normalizeVersion(value, fallback = '7.7-alpha.8') {
+function normalizeVersion(value, fallback = '7.7-alpha.9') {
   return String(value || fallback).trim().replace(/^v/i, '');
 }
 
@@ -13,6 +13,7 @@ const userscriptVersions = [...new Set([manifest.stable, version].filter(Boolean
 const previewFeatureChecks = version.startsWith('7.7-')
   ? [
       ['tools/ai-upstream-errors-local-check.mjs', version],
+      ['tools/reasoning-output-local-check.mjs', 'fixtures/reasoning-output.fixture.json', version],
       ['tools/ai-control-source-sync-local-check.mjs', version],
       ['tools/range-refresh-local-check.mjs', version],
       ['tools/runtime-performance-local-check.mjs', version]
@@ -26,6 +27,8 @@ const commands = [
   ['--check', 'tools/fetch-posts-batch-local-check.mjs'],
   ['--check', 'tools/summary-content-cache-local-check.mjs'],
   ['--check', 'tools/chat-message-actions-local-check.mjs'],
+  ['--check', 'tools/userscript-core-test-helper.mjs'],
+  ['--check', 'tools/reasoning-output-local-check.mjs'],
   ['--check', 'tools/ai-upstream-errors-local-check.mjs'],
   ['--check', 'tools/ai-control-source-sync-local-check.mjs'],
   ['--check', 'tools/api-profiles-local-check.mjs'],

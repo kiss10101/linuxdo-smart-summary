@@ -3,7 +3,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-function normalizeVersion(value, fallback = '7.7-alpha.8') {
+function normalizeVersion(value, fallback = '7.7-alpha.9') {
   return String(value || fallback).trim().replace(/^v/i, '');
 }
 
@@ -84,7 +84,7 @@ assertCountAtLeast(distText, 'loadApiProfileStateToUi();', 2, 'style1/style2 res
 
 const streamBlock = getBlock(
   distText,
-  /async streamChat\(messages, onChunk, onDone, onError(?:, options = \{\})?\)\s*\{/,
+  /async streamChat\(messages, onOutputEvent, onDone, onError(?:, options = \{\})?\)\s*\{/,
   /\n\s*buildModelsUrl\(apiUrl\)\s*\{/,
   'streamChat block'
 );

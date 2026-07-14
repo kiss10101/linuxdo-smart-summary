@@ -3,7 +3,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-function normalizeVersion(value, fallback = '7.7-alpha.8') {
+function normalizeVersion(value, fallback = '7.7-alpha.9') {
   return String(value || fallback).trim().replace(/^v/i, '');
 }
 
@@ -35,10 +35,10 @@ expectIncludes('budgetTracker.assertNext({', 'range look-behind consumes cumulat
 
 expectIncludes('scheduleSummaryRender(resultBox, getText)', 'summary streaming scheduler');
 expectIncludes('scheduleBubbleRender(messageId, bubbleDiv, getText)', 'chat streaming scheduler');
-expectIncludes('this.scheduleSummaryRender(resultBox, () => aiText)', 'summary stream uses scheduler');
-expectIncludes('this.scheduleBubbleRender(targetAssistant.id, bubble, () => aiText)', 'chat stream uses scheduler');
-expectNotIncludes('this.updateResultBox(resultBox, aiText, true);', 'summary stream direct render');
-expectNotIncludes('this.updateBubble(bubble, aiText, true);', 'chat stream direct render');
+expectIncludes('this.scheduleSummaryRender(resultBox, () => outputState)', 'summary stream schedules structured output state');
+expectIncludes('this.scheduleBubbleRender(targetAssistant.id, bubble, () => outputState)', 'chat stream schedules structured output state');
+expectNotIncludes('this.updateResultBox(resultBox, outputState, true);', 'summary stream direct render');
+expectNotIncludes('this.updateBubble(bubble, outputState, true);', 'chat stream direct render');
 
 expectIncludes('createFrameThrottledHandler(handler)', 'frame throttled helper');
 expectMatch(/window,\s*'mousemove'[\s\S]*?\{ passive: true \}/, 'global mousemove listeners are passive/throttled');

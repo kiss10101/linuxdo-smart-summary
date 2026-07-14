@@ -8,6 +8,7 @@ dist/*.user.js
 !dist/Linux.do 智能总结-7.6.1.user.js
 !dist/Linux.do 智能总结-7.7-alpha.7.user.js
 !dist/Linux.do 智能总结-7.7-alpha.8.user.js
+!dist/Linux.do 智能总结-7.7-alpha.9.user.js
 node_modules/
 .spec-workflow/
 *.log

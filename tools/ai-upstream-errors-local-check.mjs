@@ -3,7 +3,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
-function normalizeVersion(value, fallback = '7.7-alpha.8') {
+function normalizeVersion(value, fallback = '7.7-alpha.9') {
   return String(value || fallback).trim().replace(/^v/i, '');
 }
 
@@ -72,7 +72,7 @@ assertMatch(distText, /if \(status >= 500\)[\s\S]*?category: 'server'/, 'HTTP 5x
 
 const streamBlock = getBlock(
   distText,
-  /async streamChat\(messages, onChunk, onDone, onError, options = \{\}\)\s*\{/,
+  /async streamChat\(messages, onOutputEvent, onDone, onError, options = \{\}\)\s*\{/,
   /\n\s*buildModelsUrl\(apiUrl\)\s*\{/,
   'streamChat block'
 );
@@ -82,6 +82,9 @@ assertContains(streamBlock, 'const failureDefaults = { operation, apiUrl: url, m
 assertContains(streamBlock, 'this.createHttpFailure(resp, body, failureDefaults)', 'HTTP failure normalization');
 assertContains(streamBlock, 'const responseMeta = { finishReason: null, sourceConfig };', 'finish_reason metadata state');
 assertContains(streamBlock, 'const handleStreamFrame = (rawFrame) => {', 'SSE frame parser');
+assertContains(streamBlock, 'const embeddedThinkingParser = this.createEmbeddedThinkingParser();', 'embedded thinking compatibility parser');
+assertContains(streamBlock, 'emitProviderEvents(this.getAiOutputEvents(json, \'stream\'));', 'structured stream event normalization');
+assertContains(streamBlock, 'onOutputEvent?.(event)', 'structured output callback');
 assertContains(streamBlock, "if (eventName === 'error')", 'SSE error event handling');
 assertContains(streamBlock, 'if (json?.error)', 'SSE data error handling');
 assertContains(streamBlock, 'responseMeta.finishReason = choice.finish_reason;', 'stream finish_reason capture');
@@ -91,6 +94,8 @@ assertContains(streamBlock, 'kind: \'invalid_schema\'', 'non-stream invalid sche
 assertContains(streamBlock, 'onDone(responseMeta);', 'streamChat passes response metadata');
 assertContains(streamBlock, 'onError(this.normalizeAiFailure(e, failureDefaults));', 'streamChat structured onError');
 assertNotContains(streamBlock, 'catch (e) {}', 'SSE errors must not be swallowed silently');
+assertNotContains(streamBlock, "onChunk('<think>')", 'stream must not synthesize thinking tags');
+assertNotContains(streamBlock, 'thinkTagSent', 'stream must not track synthetic thinking tags');
 if (/GM_getValue\('api(Key|Url)'/.test(streamBlock) || /GM_getValue\('model'/.test(streamBlock)) {
   throw new Error('streamChat should not read legacy apiUrl/apiKey/model directly');
 }
@@ -116,6 +121,8 @@ assertContains(distText, 'btn.textContent = model;', 'model option safe text sin
 
 assertContains(distText, 'errorMeta: overrides.errorMeta || null', 'chat message stores structured error metadata');
 assertContains(distText, 'Core.createModelOutputFailure(classified', 'model output failure conversion');
+assertContains(distText, 'outputState: Core.createAiOutputState()', 'chat stores structured output state');
+assertContains(distText, 'Core.markAiOutputFailure(outputState, failure)', 'partial output survives request failure');
 assertContains(distText, 'Core.renderAiFailureBlock(failure, { operation: \'summary\' })', 'summary structured error block');
 assertContains(distText, 'Core.formatAiFailureForUi(message.errorMeta', 'chat structured error rendering');
 assertContains(distText, 'excludeFromApi: true', 'failed chat messages stay excluded from API');

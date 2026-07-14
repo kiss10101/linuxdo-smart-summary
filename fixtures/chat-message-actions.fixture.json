@@ -46,7 +46,7 @@
       "expectedAssistantStatus": { "a1": "error" },
       "expectedAssistantErrorKind": { "a1": "thinking_only" },
       "expectedDefaultApiContents": ["system prompt", "帖子内容", "初始摘要"],
-      "expectedErrorHtmlContains": ["AI 只返回了思考过程", "重新生成", "删除"]
+      "expectedErrorHtmlContains": ["AI 只返回了推理内容", "重新生成", "删除"]
     },
     {
       "name": "regenerate failed assistant reuses excluded user once",
@@ -109,6 +109,8 @@
   "distShape": {
     "requiredContains": [
       "classifyAiOutput",
+      "createAiOutputState",
+      "outputState",
       "sanitizeMessagesForApi",
       "getMessageCopyText",
       "renderChatErrorContent",

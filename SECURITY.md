@@ -19,5 +19,7 @@ Repository fixtures must use synthetic identities and topic IDs. Reserved domain
 ## Implementation Safeguards
 
 - The current preview converts Discourse cooked HTML to AI-context text with an inert `DOMParser` document, removes `script`, `style`, `iframe`, `object`, and `embed` nodes, and reads only `textContent`. If `DOMParser` is unavailable, the fallback preserves the source as uninterpreted text instead of attempting regex-based HTML filtering.
+- Provider-returned reasoning and answer fields are untrusted model output. Streaming reasoning is rendered as escaped plain text; completed reasoning may use Markdown only after strict sanitization. The reasoning panel forbids remote media and active/embedded elements so model output cannot trigger provider-selected resource loads or interactive content.
+- Reasoning UI labels describe the data as service-returned reasoning or a reasoning summary. They do not claim that the field exposes a model's complete, private, or authentic chain of thought.
 - The public-repository gate recursively inspects JSON fixture strings, extracts real `src`/`href` attributes and URL-shaped references, parses them with `URL`, and enforces HTTPS, credential-free URLs, reserved synthetic hosts, synthetic Linux.do identities/IDs, and sensitive path/query rejection.
 - Versioned `dist/` assets are immutable release artifacts. Security changes are published as new versions rather than rewriting an existing version or tag.

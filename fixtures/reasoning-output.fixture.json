@@ -1,0 +1,121 @@
+{
+  "name": "structured provider reasoning output",
+  "streamCases": [
+    {
+      "name": "reasoning before content across UTF-8 byte chunks",
+      "frames": [
+        { "choices": [{ "delta": { "reasoning_content": "先分析" } }] },
+        { "choices": [{ "delta": { "reasoning_content": "再验证" } }] },
+        { "choices": [{ "delta": { "content": "最终结论" } }] },
+        { "choices": [{ "delta": { "content": "。" }, "finish_reason": "stop" }] }
+      ],
+      "byteCuts": [1, 2, 3, 5, 8, 13, 21],
+      "expectedEvents": [
+        { "type": "reasoning_delta", "text": "先分析", "source": "reasoning_content" },
+        { "type": "reasoning_delta", "text": "再验证", "source": "reasoning_content" },
+        { "type": "content_delta", "text": "最终结论", "source": "stream" },
+        { "type": "content_delta", "text": "。", "source": "stream" }
+      ],
+      "expectedReasoning": "先分析再验证",
+      "expectedContent": "最终结论。",
+      "expectedPhase": "done"
+    },
+    {
+      "name": "interleaved native reasoning never enters final content",
+      "frames": [
+        { "choices": [{ "delta": { "reasoning_content": "R1" } }] },
+        { "choices": [{ "delta": { "content": "C1" } }] },
+        { "choices": [{ "delta": { "reasoning": "R2" } }] },
+        { "choices": [{ "delta": { "content": "C2" }, "finish_reason": "stop" }] }
+      ],
+      "byteCuts": [4, 7, 11, 17],
+      "expectedEvents": [
+        { "type": "reasoning_delta", "text": "R1", "source": "reasoning_content" },
+        { "type": "content_delta", "text": "C1", "source": "stream" },
+        { "type": "reasoning_delta", "text": "R2", "source": "reasoning" },
+        { "type": "content_delta", "text": "C2", "source": "stream" }
+      ],
+      "expectedReasoning": "R1R2",
+      "expectedContent": "C1C2",
+      "expectedPhase": "done"
+    },
+    {
+      "name": "embedded think fallback handles split tags",
+      "frames": [
+        { "choices": [{ "delta": { "content": "<thi" } }] },
+        { "choices": [{ "delta": { "content": "nk>兼容推理</thi" } }] },
+        { "choices": [{ "delta": { "content": "nk>最终正文" }, "finish_reason": "stop" }] }
+      ],
+      "byteCuts": [2, 6, 9, 15],
+      "expectedReasoning": "兼容推理",
+      "expectedContent": "最终正文",
+      "expectedPhase": "done"
+    }
+  ],
+  "nonStreamCases": [
+    {
+      "name": "non-stream reasoning and content share structured events",
+      "payload": {
+        "choices": [{
+          "message": { "reasoning_content": "非流推理", "content": "非流正文" },
+          "finish_reason": "stop"
+        }]
+      },
+      "expectedReasoning": "非流推理",
+      "expectedContent": "非流正文"
+    },
+    {
+      "name": "structured thinking field is accepted without object coercion",
+      "payload": {
+        "choices": [{
+          "message": { "thinking": { "text": "结构化推理" }, "content": "正文" },
+          "finish_reason": "stop"
+        }]
+      },
+      "expectedReasoning": "结构化推理",
+      "expectedContent": "正文"
+    }
+  ],
+  "fallbackCases": [
+    {
+      "name": "fenced code keeps literal think tags in final content",
+      "raw": "```xml\n<think>literal example</think>\n```",
+      "expectedReasoning": "",
+      "expectedContent": "```xml\n<think>literal example</think>\n```"
+    },
+    {
+      "name": "unclosed initial tag becomes reasoning without UI marker",
+      "raw": "<think>unfinished reasoning",
+      "expectedReasoning": "unfinished reasoning",
+      "expectedContent": ""
+    }
+  ],
+  "finishCases": [
+    { "finishReason": "stop", "content": "完整正文", "expectedKind": "success", "expectedPartial": false },
+    { "finishReason": "length", "content": "截断正文", "expectedKind": "finish_length", "expectedPartial": true },
+    { "finishReason": "content_filter", "content": "保留正文", "expectedKind": "finish_content_filter", "expectedPartial": true },
+    { "finishReason": "tool_calls", "content": "部分正文", "expectedKind": "finish_unsupported", "expectedPartial": true },
+    { "finishReason": "stop", "reasoning": "只有推理", "expectedKind": "thinking_only", "expectedPartial": false }
+  ],
+  "uiShape": {
+    "requiredContains": [
+      "renderAiOutputHtml(output, options = {})",
+      "renderReasoningPreview(text)",
+      "renderReasoningMarkdown(text)",
+      "data-thinking-toggle aria-expanded=",
+      "aria-controls=",
+      "aria-hidden=\"${!expanded}\"",
+      "content.hidden = !expanded",
+      ".thinking-header:focus-visible",
+      "服务返回的推理内容",
+      "data-expansion=",
+      "FORBID_TAGS: ['img'",
+      "Core.markAiOutputFailure(outputState, failure)"
+    ],
+    "forbiddenContains": [
+      "onChunk('<think>')",
+      "thinkTagSent",
+      "max-height: 5000px"
+    ]
+  }
+}

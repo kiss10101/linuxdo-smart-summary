@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "7.7-alpha.8",
+    [string]$Version = "7.7-alpha.9",
     [switch]$All,
     [switch]$SkipVerify
 )
@@ -8,6 +8,21 @@ $ErrorActionPreference = "Stop"
 
 $repo = "kiss10101/linuxdo-smart-summary"
 $releases = @(
+    @{
+        Tag          = "v7.7-alpha.9"
+        Name         = "v7.7-alpha.9"
+        AssetPattern = "*7.7-alpha.9.user.js"
+        AssetName    = "linuxdo-smart-summary-7.7-alpha.9.user.js"
+        Prerelease   = $true
+        Body         = @"
+7.7-alpha.9 structured reasoning display and partial-output resilience preview.
+
+- Keeps provider reasoning fields separate from answer content across streaming and non-streaming responses, with a conservative compatibility parser for response-leading reasoning tags.
+- Shows service-returned reasoning in an accessible collapsible panel that expands while reasoning and auto-collapses when answer content starts unless the user overrides it.
+- Preserves partial reasoning and answer text when generation stops, is filtered, reaches a length limit, or fails after output has started.
+- Treats model output as untrusted: streaming reasoning is plain text, completed reasoning is strictly sanitized, and remote media is forbidden in the reasoning panel.
+"@
+    },
     @{
         Tag          = "v7.7-alpha.8"
         Name         = "v7.7-alpha.8"

@@ -1,5 +1,14 @@
 # Changelog
 
+## 7.7-alpha.9
+
+- Separates provider-returned reasoning from answer content throughout streaming and non-streaming response handling instead of serializing reasoning into synthetic `<think>` markup.
+- Adds a conservative compatibility parser for response-leading reasoning tags while preserving tag-shaped text in normal answers and code samples.
+- Displays service-returned reasoning in an accessible collapsible panel, expands it while reasoning, and auto-collapses it when answer content starts unless the user has chosen a panel state.
+- Preserves partial reasoning and answer output when generation is stopped, filtered, length-limited, or interrupted by an upstream error.
+- Treats reasoning as untrusted model output: streams it as plain text, strictly sanitizes completed rendering, and forbids remote media in the reasoning panel.
+- Adds structured reasoning, interleaved delta, split-tag, partial-output, accessibility, sanitization, and performance regression coverage.
+
 ## 7.7-alpha.8
 
 - Routes AI-context HTML conversion through one inert-DOM text extraction path and removes the regex tag-stripping fallback from the active preview runtime.
