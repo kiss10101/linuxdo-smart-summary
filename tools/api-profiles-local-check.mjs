@@ -2,6 +2,7 @@
 
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { readProjectSource } from './source-test-helper.mjs';
 
 function normalizeVersion(value, fallback = '7.7-alpha.9') {
   return String(value || fallback).trim().replace(/^v/i, '');
@@ -58,9 +59,10 @@ function assertSettingsOrder(block, label) {
 
 const version = normalizeVersion(process.argv[2]);
 const distPath = resolve(process.cwd(), `dist/Linux.do 智能总结-${version}.user.js`);
-const distText = await readFile(distPath, 'utf8');
+const distArtifact = await readFile(distPath, 'utf8');
+const distText = await readProjectSource();
 
-assertContains(distText, `// @version      ${version}`, 'userscript version');
+assertContains(distArtifact, `// @version      ${version}`, 'userscript version');
 assertContains(distText, "apiProfilesKey: 'apiProfiles'", 'profile storage key');
 assertContains(distText, "activeApiProfileIdKey: 'activeApiProfileId'", 'active profile storage key');
 assertContains(distText, 'loadApiProfileState()', 'profile state loader');

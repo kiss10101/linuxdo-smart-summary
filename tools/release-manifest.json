@@ -1,34 +1,51 @@
 {
   "stable": "7.6.1",
-  "preview": "7.7-alpha.9",
+  "preview": "7.8.0-alpha.1",
+  "releaseRoute": [
+    "7.8.0-alpha.1",
+    "7.8.0-beta.1",
+    "7.8.0"
+  ],
   "releases": [
+    {
+      "version": "7.8.0-alpha.1",
+      "tag": "v7.8.0-alpha.1",
+      "localAsset": "dist/Linux.do 智能总结-7.8.0-alpha.1.user.js",
+      "uploadAsset": "linuxdo-smart-summary-7.8.0-alpha.1.user.js",
+      "prerelease": true,
+      "validationProfile": "current"
+    },
     {
       "version": "7.7-alpha.9",
       "tag": "v7.7-alpha.9",
       "localAsset": "dist/Linux.do 智能总结-7.7-alpha.9.user.js",
       "uploadAsset": "linuxdo-smart-summary-7.7-alpha.9.user.js",
-      "prerelease": true
+      "prerelease": true,
+      "validationProfile": "legacy"
     },
     {
       "version": "7.7-alpha.8",
       "tag": "v7.7-alpha.8",
       "localAsset": "dist/Linux.do 智能总结-7.7-alpha.8.user.js",
       "uploadAsset": "linuxdo-smart-summary-7.7-alpha.8.user.js",
-      "prerelease": true
+      "prerelease": true,
+      "validationProfile": "legacy"
     },
     {
       "version": "7.7-alpha.7",
       "tag": "v7.7-alpha.7",
       "localAsset": "dist/Linux.do 智能总结-7.7-alpha.7.user.js",
       "uploadAsset": "linuxdo-smart-summary-7.7-alpha.7.user.js",
-      "prerelease": true
+      "prerelease": true,
+      "validationProfile": "legacy"
     },
     {
       "version": "7.6.1",
       "tag": "v7.6.1",
       "localAsset": "dist/Linux.do 智能总结-7.6.1.user.js",
       "uploadAsset": "linuxdo-smart-summary-7.6.1.user.js",
-      "prerelease": false
+      "prerelease": false,
+      "validationProfile": "legacy"
     }
   ]
 }

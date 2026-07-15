@@ -231,6 +231,26 @@ for (const fragment of [
   if (!workflow.includes(fragment)) fail(`workflow hardening is missing: ${fragment}`);
 }
 
+const ciWorkflow = await readText('.github/workflows/ci.yml');
+for (const fragment of [
+  'permissions:\n  contents: read',
+  'actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10',
+  'actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e',
+  'npm ci',
+  'npm run build',
+  'git diff --exit-code -- dist',
+  'npm run verify'
+]) {
+  if (!ciWorkflow.includes(fragment)) fail(`CI hardening is missing: ${fragment}`);
+}
+if (/contents:\s*write/.test(ciWorkflow)) fail('CI workflow must not request write permission');
+
+const packageLock = await readText('package-lock.json');
+if (packageLock.includes('registry.npmmirror.com')) fail('package lock must not depend on a local registry mirror');
+if (!packageLock.includes('https://registry.npmjs.org/esbuild/-/esbuild-0.28.1.tgz')) {
+  fail('package lock must pin esbuild 0.28.1 from the official registry');
+}
+
 const readme = await readText('README.md');
 const readmeZh = await readText('README.zh-CN.md');
 for (const [label, text] of [['README.md', readme], ['README.zh-CN.md', readmeZh]]) {

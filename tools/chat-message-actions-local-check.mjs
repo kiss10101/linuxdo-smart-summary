@@ -2,14 +2,15 @@
 
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { loadUserscriptCore } from './userscript-core-test-helper.mjs';
+import { Core } from '../src/core/index.js';
+import { readProjectSource } from './source-test-helper.mjs';
 
 const fixturePath = process.argv[2] || 'fixtures/chat-message-actions.fixture.json';
 const version = process.argv[3] || '7.7-alpha.9';
 const fixture = JSON.parse(await readFile(resolve(process.cwd(), fixturePath), 'utf8'));
 const distPath = resolve(process.cwd(), `dist/Linux.do 智能总结-${version}.user.js`);
 const distText = await readFile(distPath, 'utf8');
-const { Core } = loadUserscriptCore(distText);
+const sourceText = await readProjectSource();
 
 function createVisibleMessage(message) {
   return {
@@ -292,11 +293,11 @@ for (const flow of fixture.messageFlows || []) {
 }
 
 for (const fragment of fixture.distShape?.requiredContains || []) {
-  assertContains(distText, fragment, `dist contains ${fragment}`);
+  assertContains(sourceText, fragment, `source contains ${fragment}`);
 }
 for (const pattern of fixture.distShape?.requiredRegex || []) {
   const regex = new RegExp(pattern);
-  if (!regex.test(distText)) throw new Error(`dist regex missing: ${pattern}`);
+  if (!regex.test(sourceText)) throw new Error(`source regex missing: ${pattern}`);
 }
 
 console.log('All chat message action cases passed.');

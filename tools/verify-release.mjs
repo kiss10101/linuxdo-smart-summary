@@ -4,7 +4,9 @@ import { readFile, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 
-function normalizeVersion(value, fallback = '7.7-alpha.9') {
+const packageJson = JSON.parse(await readFile(resolve(process.cwd(), 'package.json'), 'utf8'));
+
+function normalizeVersion(value, fallback = packageJson.version) {
   return String(value || fallback).trim().replace(/^v/i, '');
 }
 
@@ -26,18 +28,23 @@ function includes(text, needle, label) {
   if (!text.includes(needle)) fail(`${label}: missing ${needle}`);
 }
 
-function buildReleaseLine(manifest, targetVersion) {
-  const history = [];
-  for (const item of [...manifest.releases].reverse()) {
-    if (!history.includes(item.version)) history.push(item.version);
-  }
-  if (!history.includes(targetVersion)) history.push(targetVersion);
-  return history.slice(0, history.indexOf(targetVersion) + 1).join(' -> ');
+function buildReleaseLine(manifest) {
+  return Array.isArray(manifest.releaseRoute) ? manifest.releaseRoute.join(' -> ') : '';
 }
 
 const failures = [];
 const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
 const release = manifest.releases.find((item) => item.version === version);
+
+if (!Array.isArray(manifest.releaseRoute) || manifest.releaseRoute.length !== 3) {
+  fail('release-manifest: releaseRoute must contain exactly alpha.1, beta.1, and stable');
+} else {
+  const baseVersion = manifest.releaseRoute[2];
+  const expectedRoute = [`${baseVersion}-alpha.1`, `${baseVersion}-beta.1`, baseVersion];
+  if (JSON.stringify(manifest.releaseRoute) !== JSON.stringify(expectedRoute)) {
+    fail(`release-manifest: releaseRoute should be ${expectedRoute.join(' -> ')}`);
+  }
+}
 
 if (!release) {
   fail(`release-manifest: missing release ${version}`);
@@ -51,8 +58,13 @@ if (!release) {
   }
 }
 
-if (isPrerelease && manifest.preview !== version) fail(`release-manifest: preview should be ${version}`);
-if (!isPrerelease && manifest.stable !== version) fail(`release-manifest: stable should be ${version}`);
+if (release?.validationProfile === 'current') {
+  if (isPrerelease && manifest.preview !== version) fail(`release-manifest: preview should be ${version}`);
+  if (!isPrerelease && manifest.stable !== version) fail(`release-manifest: stable should be ${version}`);
+  if (packageJson.version !== version) {
+    fail(`package.json: version should be ${version}, got ${packageJson.version}`);
+  }
+}
 
 const localAsset = release?.localAsset || `dist/Linux.do 智能总结-${version}.user.js`;
 const uploadAsset = release?.uploadAsset || `linuxdo-smart-summary-${version}.user.js`;
@@ -81,23 +93,32 @@ if (existsSync(resolve(repoRoot, localAsset))) {
 
 const changelog = await readText('CHANGELOG.md');
 const firstHeading = changelog.match(/^##\s+(.+)$/m)?.[1]?.trim();
-if (firstHeading !== version) fail(`CHANGELOG.md: first heading should be ${version}, got ${firstHeading || 'none'}`);
+if (release?.validationProfile === 'current' && firstHeading !== version) {
+  fail(`CHANGELOG.md: first heading should be ${version}, got ${firstHeading || 'none'}`);
+}
+includes(changelog, `## ${version}`, 'CHANGELOG.md release heading');
 
-for (const readmePath of ['README.md', 'README.zh-CN.md']) {
-  const readme = await readText(readmePath);
-  const channelLabel = isPrerelease ? 'preview' : 'stable';
-  const releaseLine = buildReleaseLine(manifest, version);
-  includes(readme, `/releases/download/${tag}/${uploadAsset}`, `${readmePath} ${channelLabel} link`);
-  includes(readme, `${channelLabel}-${version.replace(/-/g, '--')}`, `${readmePath} ${channelLabel} badge`);
-  includes(readme, `\`${version}\``, `${readmePath} ${channelLabel} version token`);
-  includes(readme, releaseLine, `${readmePath} release line`);
-  includes(readme, `"dist/Linux.do 智能总结-${version}.user.js"`, `${readmePath} syntax check command`);
-  includes(readme, 'node tools/check-all.mjs', `${readmePath} check-all command`);
-  includes(readme, `node tools/verify-release.mjs ${version}`, `${readmePath} verify-release command`);
+if (release?.validationProfile === 'current') {
+  for (const readmePath of ['README.md', 'README.zh-CN.md']) {
+    const readme = await readText(readmePath);
+    const channelLabel = isPrerelease ? 'preview' : 'stable';
+    const releaseLine = buildReleaseLine(manifest);
+    includes(readme, `/releases/download/${tag}/${uploadAsset}`, `${readmePath} ${channelLabel} link`);
+    includes(readme, `${channelLabel}-${version.replace(/-/g, '--')}`, `${readmePath} ${channelLabel} badge`);
+    includes(readme, `\`${version}\``, `${readmePath} ${channelLabel} version token`);
+    includes(readme, releaseLine, `${readmePath} release line`);
+    includes(readme, `"dist/Linux.do 智能总结-${version}.user.js"`, `${readmePath} syntax check command`);
+    includes(readme, 'npm run build', `${readmePath} build command`);
+    includes(readme, 'npm run verify', `${readmePath} verify command`);
+    includes(readme, 'node tools/check-all.mjs', `${readmePath} check-all command`);
+    includes(readme, `node tools/verify-release.mjs ${version}`, `${readmePath} verify-release command`);
+  }
 }
 
 const releaseScript = await readText('tools/create-github-releases.ps1');
-includes(releaseScript, `[string]$Version = "${version}"`, 'release script default version');
+if (release?.validationProfile === 'current') {
+  includes(releaseScript, `[string]$Version = "${version}"`, 'release script default version');
+}
 includes(releaseScript, `Tag          = "${tag}"`, 'release script tag');
 includes(releaseScript, `Name         = "${tag}"`, 'release script name');
 includes(releaseScript, `AssetPattern = "*${version}.user.js"`, 'release script asset pattern');
@@ -112,6 +133,11 @@ includes(workflow, '    permissions:\n      contents: write', 'release job write
 includes(workflow, 'actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10', 'pinned checkout action');
 includes(workflow, 'actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e', 'pinned setup-node action');
 includes(workflow, 'INPUT_VERSION: ${{ github.event.inputs.version }}', 'workflow dispatch input environment');
+includes(workflow, 'ref: ${{ needs.resolve.outputs.tag }}', 'release workflow tag checkout');
+includes(workflow, 'npm ci', 'release workflow locked install');
+includes(workflow, 'npm run build', 'release workflow build');
+includes(workflow, 'git diff --exit-code -- dist', 'release workflow generated diff check');
+includes(workflow, 'npm run test:source', 'release workflow source tests');
 if (workflow.includes('raw_version="${{ github.event.inputs.version }}"')) {
   fail('release workflow: dispatch input must not be interpolated directly into shell source');
 }

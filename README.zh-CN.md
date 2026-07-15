@@ -11,14 +11,14 @@
 
 <p align="center">
   <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases/download/v7.6.1/linuxdo-smart-summary-7.6.1.user.js">安装稳定版 7.6.1</a> ·
-  <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases/download/v7.7-alpha.9/linuxdo-smart-summary-7.7-alpha.9.user.js">预览版 7.7-alpha.9</a> ·
+  <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases/download/v7.8.0-alpha.1/linuxdo-smart-summary-7.8.0-alpha.1.user.js">预览版 7.8.0-alpha.1</a> ·
   <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases">Releases</a> ·
   <a href="./CHANGELOG.md">更新日志</a>
 </p>
 
 <p align="center">
   <img alt="stable" src="https://img.shields.io/badge/stable-7.6.1-2563eb">
-  <img alt="preview" src="https://img.shields.io/badge/preview-7.7--alpha.9-f59e0b">
+  <img alt="preview" src="https://img.shields.io/badge/preview-7.8.0--alpha.1-f59e0b">
   <img alt="platform" src="https://img.shields.io/badge/platform-linux.do-16a34a">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-64748b">
 </p>
@@ -29,28 +29,26 @@
 AI 总结、内容导出和后续追问。AI 服务由用户在侧边栏里配置，兼容 OpenAI
 风格接口。
 
-这个仓库是公开发布工作区：`dist/` 保存可安装脚本，`tools/` 保存本地校验和
-发布工具，`fixtures/` 只保存合成测试数据。
+这个仓库是公开发布工作区：可维护的 ES 模块位于 `src/`，构建工具将其确定性地
+打包为 `dist/` 下的单文件 userscript；`tests/` 与 `fixtures/` 保存源码测试和
+合成测试数据。
 
 ## 发布通道
 
 | 通道 | 版本 | 适用场景 | 说明 |
 | --- | --- | --- | --- |
 | 稳定版 | `7.6.1` | 需要最稳妥的安装版本 | 以已验证的 `7.6` 运行时为基础，固定 marked/DOMPurify 依赖并使用隐私清理后的公开 fixture |
-| 预览版 | `7.7-alpha.9` | 需要最新公开预览版 | 将服务返回的推理与答案分离，增加无障碍推理面板，保留部分输出，并强化推理内容渲染安全，不改变 Linux.do 请求行为 |
+| 预览版 | `7.8.0-alpha.1` | 需要模块化架构预览版 | 维护端拆为 27 个源码模块，安装端仍是一个油猴脚本；增加确定性构建，并让模型列表请求可取消、可超时 |
 
 版本线：
 
 ```text
-7.6.1 -> 7.7-alpha.7 -> 7.7-alpha.8 -> 7.7-alpha.9
+7.8.0-alpha.1 -> 7.8.0-beta.1 -> 7.8.0
 ```
 
 GitHub 会把最新的非 prerelease 版本标记为 `Latest`；稳定版 `7.6.1` 仍是默认安装目标，
-`7.7-alpha.9` 是当前 prerelease 预览版。
-
-公开 Git 历史从隐私清理后的 `7.6.1` 稳定基线开始，经 `7.7-alpha.7`、`7.7-alpha.8` 继续到 `7.7-alpha.9`。
-更早的开发提交和 prerelease 标签保留在私有归档中；公开仓库通过 CHANGELOG
-保留版本语义，但不导入私有历史。
+`7.8.0-alpha.1` 是当前 prerelease 预览版。架构迁移只设一个 alpha、一个 beta 和
+一个正式版；历史 `7.7` 条目保留在 CHANGELOG 中用于审计，不再算作迁移发布站点。
 
 ## 核心行为
 
@@ -75,7 +73,7 @@ GitHub 会把最新的非 prerelease 版本标记为 `Latest`；稳定版 `7.6.1
 | Boosts | 从现有 Discourse JSON 载荷中读取 boosts |
 | 总结覆盖报告 | 展示请求范围、主题真实最高楼层、实际可见楼层数、缓存状态和回看校准状态 |
 | 导出 | 将明确拉取到的帖子集合导出为 HTML 或 AI 可读文本 |
-| 模型选择 | 从用户配置的 OpenAI 兼容接口读取模型列表 |
+| 模型选择 | 仅在请求进行中禁用两个获取按钮；关闭弹窗、15 秒超时、成功、失败或 UI 销毁都会取消请求或恢复按钮 |
 | API 配置档案 | 点击配置卡片立即切换，并自动持久化编辑、新增、复制和删除 |
 
 ## 网络模型
@@ -115,97 +113,40 @@ topic JSON 短缓存，只用于让范围设置、总结和导出共享同一份
 
 | 路径 | 用途 |
 | --- | --- |
+| `src/` | 可维护的 ES 模块和 userscript 元数据模板 |
 | `dist/` | 可安装 userscript 构建文件 |
+| `tests/` | 直接调用源码模块的行为与生命周期测试 |
 | `tools/` | 本地校验和发布工具 |
 | `fixtures/` | 可重复的合成测试数据 |
 | `.github/` | Release workflow 和仓库自动化 |
+| `package.json` | 可复现构建与统一校验入口 |
 
 ## 验证命令
 
-在仓库根目录执行：
+在仓库根目录安装锁定工具链、构建单文件脚本，并执行源码、行为、架构、隐私与
+发布一致性校验：
 
 ```bash
-node --check "dist/Linux.do 智能总结-7.6.1.user.js"
-node --check "dist/Linux.do 智能总结-7.7-alpha.9.user.js"
-node --check tools/range-mapping-local-check.mjs
-node --check tools/reply-relation-local-check.mjs
-node --check tools/fetch-posts-batch-local-check.mjs
-node --check tools/summary-content-cache-local-check.mjs
-node --check tools/chat-message-actions-local-check.mjs
-node --check tools/ai-upstream-errors-local-check.mjs
-node --check tools/reasoning-output-local-check.mjs
-node --check tools/ai-control-source-sync-local-check.mjs
-node --check tools/api-profiles-local-check.mjs
-node --check tools/range-refresh-local-check.mjs
-node --check tools/summary-selection-local-check.mjs
-node --check tools/runtime-performance-local-check.mjs
-node --check tools/html-to-text-local-check.mjs
-node --check tools/post-timestamps-local-check.mjs
-node --check tools/quote-attribution-local-check.mjs
-node --check tools/boosts-local-check.mjs
-node --check tools/topic-identity-local-check.mjs
-node --check tools/topic-bounds-local-check.mjs
-node --check tools/public-repository-local-check.mjs
-node --check tools/verify-release.mjs
-node --check tools/check-all.mjs
-
-node tools/range-mapping-local-check.mjs fixtures/post-stream-gap.fixture.json
-node tools/reply-relation-local-check.mjs fixtures/reply-relation.fixture.json
-node tools/fetch-posts-batch-local-check.mjs fixtures/fetch-posts-batch.fixture.json
-node tools/summary-content-cache-local-check.mjs fixtures/summary-content-cache.fixture.json
-node tools/chat-message-actions-local-check.mjs fixtures/chat-message-actions.fixture.json 7.7-alpha.9
-node tools/ai-upstream-errors-local-check.mjs 7.7-alpha.9
-node tools/reasoning-output-local-check.mjs fixtures/reasoning-output.fixture.json 7.7-alpha.9
-node tools/ai-control-source-sync-local-check.mjs 7.7-alpha.9
-node tools/api-profiles-local-check.mjs 7.7-alpha.9
-node tools/range-refresh-local-check.mjs 7.7-alpha.9
-node tools/summary-selection-local-check.mjs fixtures/summary-selection.fixture.json 7.7-alpha.9
-node tools/runtime-performance-local-check.mjs 7.7-alpha.9
-node tools/html-to-text-local-check.mjs fixtures/html-to-text.fixture.json 7.7-alpha.9
-node tools/post-timestamps-local-check.mjs fixtures/post-timestamps.fixture.json 7.7-alpha.9
-node tools/quote-attribution-local-check.mjs fixtures/quote-attribution.fixture.json
-node tools/boosts-local-check.mjs fixtures/boosts.fixture.json
-node tools/topic-identity-local-check.mjs fixtures/topic-identity.fixture.json
-node tools/topic-bounds-local-check.mjs fixtures/topic-bounds.fixture.json
-node tools/public-repository-local-check.mjs 7.7-alpha.9
-node tools/verify-release.mjs 7.7-alpha.9
-node tools/check-all.mjs 7.7-alpha.9
+npm ci
+npm run build
+npm run verify
+node --check "dist/Linux.do 智能总结-7.8.0-alpha.1.user.js"
+node tools/verify-release.mjs 7.8.0-alpha.1
+node tools/check-all.mjs 7.8.0-alpha.1
 ```
 
-预期 fixture 输出：
-
-```text
-All cases passed. Old slice mismatches demonstrated: 4
-All reply relation cases passed.
-All fetch batch cases passed.
-All summary content cache cases passed.
-All chat message action cases passed.
-AI upstream errors check passed for 7.7-alpha.9.
-Reasoning output check passed for 7.7-alpha.9.
-AI control/source/settings sync check passed for 7.7-alpha.9.
-API profiles check passed for 7.7-alpha.9.
-Range refresh check passed for 7.7-alpha.9.
-All summary selection cases passed.
-Runtime performance check passed for 7.7-alpha.9.
-HTML-to-text check passed for 7.7-alpha.9.
-Post timestamps check passed for 7.7-alpha.9.
-All quote attribution cases passed.
-All boost formatting cases passed.
-All topic identity cases passed.
-Topic bounds local check passed.
-Public repository check passed for 7.7-alpha.9.
-Release verification passed for 7.7-alpha.9.
-All local checks passed.
-```
+`dist/` 是生成物。修改应发生在 `src/`，随后运行 `npm run build`，并让源码和对应
+生成文件一同进入变更。生成物陈旧或构建不确定时，`npm run verify` 会失败。
 
 ## 自动发版
 
 GitHub Release 由 `.github/workflows/release.yml` 发布。
 
-- 推送新标签，例如 `v7.7-alpha.9`，会自动触发发版。
-- 对已经存在的标签，可以在 GitHub Actions 页面手动运行 `Release` workflow，输入 `7.7-alpha.9` 来发布或修复该版本的 Release。
+- Pull Request 和普通 `master` 推送会运行只读的 `CI` workflow。
+- 推送新标签，例如 `v7.8.0-alpha.1`，会自动触发发版。
+- 对已经存在的标签，可以在 GitHub Actions 页面手动运行 `Release` workflow，输入 `7.8.0-alpha.1` 来发布或修复该版本的 Release。
 - 普通 `master` 推送不会发布 Release；发版任务只由标签或手动运行触发。
-- workflow 会执行 `node tools/check-all.mjs <version>`，从 `release-manifest.json` 准备重命名后的 asset，并用 GitHub Actions 自带的 `GITHUB_TOKEN` 上传。
+- workflow 会从 `package-lock.json` 安装依赖、重建 `dist/`、拒绝生成漂移、执行完整校验，再从 `release-manifest.json` 选择 asset，并用 GitHub Actions 自带的 `GITHUB_TOKEN` 上传。
 
 ## 隐私与安全
 

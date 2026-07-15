@@ -11,14 +11,14 @@
 
 <p align="center">
   <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases/download/v7.6.1/linuxdo-smart-summary-7.6.1.user.js">Install stable 7.6.1</a> ·
-  <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases/download/v7.7-alpha.9/linuxdo-smart-summary-7.7-alpha.9.user.js">Preview 7.7-alpha.9</a> ·
+  <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases/download/v7.8.0-alpha.1/linuxdo-smart-summary-7.8.0-alpha.1.user.js">Preview 7.8.0-alpha.1</a> ·
   <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases">Releases</a> ·
   <a href="./CHANGELOG.md">Changelog</a>
 </p>
 
 <p align="center">
   <img alt="stable" src="https://img.shields.io/badge/stable-7.6.1-2563eb">
-  <img alt="preview" src="https://img.shields.io/badge/preview-7.7--alpha.9-f59e0b">
+  <img alt="preview" src="https://img.shields.io/badge/preview-7.8.0--alpha.1-f59e0b">
   <img alt="platform" src="https://img.shields.io/badge/platform-linux.do-16a34a">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-64748b">
 </p>
@@ -29,30 +29,29 @@
 topics, export topic content, and continue follow-up conversations with an
 OpenAI-compatible model provider configured by the user.
 
-This repository is the public release workspace. It keeps installable builds
-under `dist/`, deterministic local checks under `tools/`, and synthetic test
-data under `fixtures/`.
+This repository is the public release workspace. Maintainable ES modules live
+under `src/`; deterministic tooling bundles them into one installable userscript
+under `dist/`. Synthetic fixtures and direct source tests live under `fixtures/`
+and `tests/`.
 
 ## Release Channels
 
 | Channel | Version | Use when | Notes |
 | --- | --- | --- | --- |
 | Stable | `7.6.1` | You want the safest install target | Repackages the verified `7.6` runtime with pinned marked/DOMPurify dependencies and privacy-clean public fixtures |
-| Preview | `7.7-alpha.9` | You want the latest public preview | Separates provider-returned reasoning from answers, adds an accessible reasoning panel, preserves partial output, and applies stricter reasoning-content rendering without changing Linux.do request behavior |
+| Preview | `7.8.0-alpha.1` | You want the modular architecture preview | Moves maintenance to 27 source modules, keeps one-file Tampermonkey installation, adds deterministic builds, and makes model-list loading cancellable and time-bounded |
 
 Release line:
 
 ```text
-7.6.1 -> 7.7-alpha.7 -> 7.7-alpha.8 -> 7.7-alpha.9
+7.8.0-alpha.1 -> 7.8.0-beta.1 -> 7.8.0
 ```
 
 GitHub marks the latest non-prerelease as `Latest`; stable `7.6.1` remains the
-default install target while `7.7-alpha.9` is the current prerelease preview.
-
-The public Git history starts from a privacy-clean `7.6.1` stable baseline and
-continues through `7.7-alpha.7`, `7.7-alpha.8`, and `7.7-alpha.9`. Earlier development commits and prerelease
-tags remain in the private archive; their release semantics are retained here
-in the changelog without importing the private history.
+default install target while `7.8.0-alpha.1` is the current prerelease preview.
+The architecture migration deliberately has only three public gates: one alpha,
+one beta, and the stable release. Historical `7.7` entries remain in the
+changelog for auditability, not as additional migration stops.
 
 ## Core Behavior
 
@@ -77,7 +76,7 @@ in the changelog without importing the private history.
 | Boosts | Reads boosts from existing Discourse JSON payloads |
 | Summary coverage | Shows requested range, true topic upper bound, visible post count, cache status, and look-behind status |
 | Export | Exports the explicitly fetched post set as HTML or AI-readable text |
-| Model picker | Fetches model names from the user-configured OpenAI-compatible API |
+| Model picker | Disables both fetch controls only while its provider request is active; close, timeout (15 seconds), success, failure, and UI teardown all cancel or restore the controls |
 | API profiles | Clickable profile cards switch immediately and persist edits/add/copy/delete actions |
 
 ## Network Model
@@ -119,97 +118,41 @@ persistent topic database.
 
 | Path | Purpose |
 | --- | --- |
+| `src/` | Maintainable ES modules and userscript metadata template |
 | `dist/` | Installable userscript builds |
+| `tests/` | Direct source-module and lifecycle tests |
 | `tools/` | Local checks and release helpers |
 | `fixtures/` | Deterministic synthetic test data |
 | `.github/` | Release workflow and repository automation |
+| `package.json` | Reproducible build and verification entry points |
 
 ## Verification
 
-Run from the repository root:
+Install the locked toolchain, build the one-file userscript, and run every
+source, behavior, architecture, privacy, and release check:
 
 ```bash
-node --check "dist/Linux.do 智能总结-7.6.1.user.js"
-node --check "dist/Linux.do 智能总结-7.7-alpha.9.user.js"
-node --check tools/range-mapping-local-check.mjs
-node --check tools/reply-relation-local-check.mjs
-node --check tools/fetch-posts-batch-local-check.mjs
-node --check tools/summary-content-cache-local-check.mjs
-node --check tools/chat-message-actions-local-check.mjs
-node --check tools/ai-upstream-errors-local-check.mjs
-node --check tools/reasoning-output-local-check.mjs
-node --check tools/ai-control-source-sync-local-check.mjs
-node --check tools/api-profiles-local-check.mjs
-node --check tools/range-refresh-local-check.mjs
-node --check tools/summary-selection-local-check.mjs
-node --check tools/runtime-performance-local-check.mjs
-node --check tools/html-to-text-local-check.mjs
-node --check tools/post-timestamps-local-check.mjs
-node --check tools/quote-attribution-local-check.mjs
-node --check tools/boosts-local-check.mjs
-node --check tools/topic-identity-local-check.mjs
-node --check tools/topic-bounds-local-check.mjs
-node --check tools/public-repository-local-check.mjs
-node --check tools/verify-release.mjs
-node --check tools/check-all.mjs
-
-node tools/range-mapping-local-check.mjs fixtures/post-stream-gap.fixture.json
-node tools/reply-relation-local-check.mjs fixtures/reply-relation.fixture.json
-node tools/fetch-posts-batch-local-check.mjs fixtures/fetch-posts-batch.fixture.json
-node tools/summary-content-cache-local-check.mjs fixtures/summary-content-cache.fixture.json
-node tools/chat-message-actions-local-check.mjs fixtures/chat-message-actions.fixture.json 7.7-alpha.9
-node tools/ai-upstream-errors-local-check.mjs 7.7-alpha.9
-node tools/reasoning-output-local-check.mjs fixtures/reasoning-output.fixture.json 7.7-alpha.9
-node tools/ai-control-source-sync-local-check.mjs 7.7-alpha.9
-node tools/api-profiles-local-check.mjs 7.7-alpha.9
-node tools/range-refresh-local-check.mjs 7.7-alpha.9
-node tools/summary-selection-local-check.mjs fixtures/summary-selection.fixture.json 7.7-alpha.9
-node tools/runtime-performance-local-check.mjs 7.7-alpha.9
-node tools/html-to-text-local-check.mjs fixtures/html-to-text.fixture.json 7.7-alpha.9
-node tools/post-timestamps-local-check.mjs fixtures/post-timestamps.fixture.json 7.7-alpha.9
-node tools/quote-attribution-local-check.mjs fixtures/quote-attribution.fixture.json
-node tools/boosts-local-check.mjs fixtures/boosts.fixture.json
-node tools/topic-identity-local-check.mjs fixtures/topic-identity.fixture.json
-node tools/topic-bounds-local-check.mjs fixtures/topic-bounds.fixture.json
-node tools/public-repository-local-check.mjs 7.7-alpha.9
-node tools/verify-release.mjs 7.7-alpha.9
-node tools/check-all.mjs 7.7-alpha.9
+npm ci
+npm run build
+npm run verify
+node --check "dist/Linux.do 智能总结-7.8.0-alpha.1.user.js"
+node tools/verify-release.mjs 7.8.0-alpha.1
+node tools/check-all.mjs 7.8.0-alpha.1
 ```
 
-Expected fixture output:
-
-```text
-All cases passed. Old slice mismatches demonstrated: 4
-All reply relation cases passed.
-All fetch batch cases passed.
-All summary content cache cases passed.
-All chat message action cases passed.
-AI upstream errors check passed for 7.7-alpha.9.
-Reasoning output check passed for 7.7-alpha.9.
-AI control/source/settings sync check passed for 7.7-alpha.9.
-API profiles check passed for 7.7-alpha.9.
-Range refresh check passed for 7.7-alpha.9.
-All summary selection cases passed.
-Runtime performance check passed for 7.7-alpha.9.
-HTML-to-text check passed for 7.7-alpha.9.
-Post timestamps check passed for 7.7-alpha.9.
-All quote attribution cases passed.
-All boost formatting cases passed.
-All topic identity cases passed.
-Topic bounds local check passed.
-Public repository check passed for 7.7-alpha.9.
-Release verification passed for 7.7-alpha.9.
-All local checks passed.
-```
+`dist/` is generated. Make changes in `src/`, run `npm run build`, and commit the
+matching source and generated userscript together. `npm run verify` fails when
+the generated file is stale or nondeterministic.
 
 ## Release Automation
 
 GitHub Releases are published by `.github/workflows/release.yml`.
 
-- Push a new tag like `v7.7-alpha.9` to trigger an automatic release.
-- Use the manual `Release` workflow with input `7.7-alpha.9` to publish or repair an existing tag release.
+- Pull requests and `master` pushes run the read-only `CI` workflow.
+- Push a new tag like `v7.8.0-alpha.1` to trigger an automatic release.
+- Use the manual `Release` workflow with input `7.8.0-alpha.1` to publish or repair an existing tag release.
 - A normal `master` push does not publish a release; the release job is tag/manual only.
-- The workflow runs `node tools/check-all.mjs <version>`, prepares a renamed asset from `release-manifest.json`, and uploads it with GitHub Actions' `GITHUB_TOKEN`.
+- The workflow installs from `package-lock.json`, rebuilds `dist/`, rejects generated drift, runs the complete verification suite, and uploads the manifest-selected asset with GitHub Actions' `GITHUB_TOKEN`.
 
 ## Privacy And Safety
 

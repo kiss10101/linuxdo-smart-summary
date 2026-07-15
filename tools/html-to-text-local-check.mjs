@@ -2,6 +2,8 @@
 
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { Core } from '../src/core/index.js';
+import { readProjectSource } from './source-test-helper.mjs';
 
 function normalizeVersion(value, fallback = '7.7-alpha.9') {
   return String(value || fallback).trim().replace(/^v/i, '');
@@ -127,21 +129,24 @@ function browserLikeTextContent(source, removedTags) {
   return decodeEntitiesOnce(text);
 }
 
-function normalizePlainText(text) {
-  return String(text ?? '')
-    .replace(/\r\n/g, '\n')
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .replace(/[ \t]{2,}/g, ' ')
-    .replace(/\s+([,.!?;:，。！？；：])/g, '$1')
-    .trim();
-}
-
-function plainTextFromHtmlReference(source) {
-  return normalizePlainText(browserLikeTextContent(
-    String(source ?? ''),
-    new Set(['script', 'style', 'iframe', 'object', 'embed'])
-  ));
+class FixtureDOMParser {
+  parseFromString(source) {
+    const removedTags = new Set();
+    return {
+      querySelectorAll(selector) {
+        return selector.split(',').map((tag) => ({
+          remove() {
+            removedTags.add(tag.trim());
+          }
+        }));
+      },
+      body: {
+        get textContent() {
+          return browserLikeTextContent(String(source ?? ''), removedTags);
+        }
+      }
+    };
+  }
 }
 
 function extractBlock(text, startMarker, endMarker, label) {
@@ -155,12 +160,14 @@ function extractBlock(text, startMarker, endMarker, label) {
 const fixturePath = process.argv[2] || 'fixtures/html-to-text.fixture.json';
 const version = normalizeVersion(process.argv[3]);
 const fixture = JSON.parse(await readFile(resolve(process.cwd(), fixturePath), 'utf8'));
-const distText = await readFile(resolve(process.cwd(), `dist/Linux.do 智能总结-${version}.user.js`), 'utf8');
+const distArtifact = await readFile(resolve(process.cwd(), `dist/Linux.do 智能总结-${version}.user.js`), 'utf8');
+const sourceText = await readProjectSource();
+assertContains(distArtifact, `// @version      ${version}`, 'userscript version');
 
 const plainTextMethods = extractBlock(
-  distText,
-  '        getHtmlParser() {',
-  '        truncatePlainText(',
+  sourceText,
+  '    getHtmlParser() {',
+  '    truncatePlainText(',
   'HTML-to-text methods'
 );
 assertContains(plainTextMethods, "parser.parseFromString(source, 'text/html')", 'inert DOM parsing');
@@ -169,25 +176,32 @@ assertContains(plainTextMethods, 'if (!parser) return this.normalizePlainText(so
 assertNotContains(plainTextMethods, '.replace(/<', 'HTML regex stripping');
 
 const formatPostBlock = extractBlock(
-  distText,
-  '        formatPostForAiContext(',
-  '        formatPostsForAiContext(',
+  sourceText,
+  '    formatPostForAiContext(',
+  '    formatPostsForAiContext(',
   'formatPostForAiContext'
 );
 assertContains(formatPostBlock, "let content = `${post?.cooked ?? ''}`;", 'nullable cooked normalization');
 assertContains(formatPostBlock, 'content = this.plainTextFromHtml(content);', 'shared HTML-to-text path');
 assertNotContains(formatPostBlock, ".replace(/<[^>]+>/g, '')", 'legacy tag-stripping regex');
 
+const originalDOMParser = globalThis.DOMParser;
+globalThis.DOMParser = FixtureDOMParser;
+Core.htmlParser = null;
 for (const testCase of fixture.cases) {
-  const actual = plainTextFromHtmlReference(testCase.html);
+  const actual = Core.plainTextFromHtml(testCase.html);
   console.log(`${testCase.name}: ${JSON.stringify(actual)}`);
   assertEqual(actual, testCase.expected, testCase.name);
 }
 
+globalThis.DOMParser = undefined;
+Core.htmlParser = null;
 assertEqual(
-  normalizePlainText('<b>raw</b>  text'),
+  Core.plainTextFromHtml('<b>raw</b>  text'),
   '<b>raw</b> text',
   'DOMParser-unavailable fallback preserves text without interpreting HTML'
 );
+globalThis.DOMParser = originalDOMParser;
+Core.htmlParser = null;
 
 console.log(`HTML-to-text check passed for ${version}.`);

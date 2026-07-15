@@ -1,0 +1,1031 @@
+import { CONFIG } from '../../config.js';
+import { Core } from '../../core/index.js';
+import { UIRegistry } from '../registry.js';
+
+export const style1Interactions = {
+    createEmptyChatSession() {
+        return {
+            context: null,
+            baseMessages: [],
+            visibleMessages: []
+        };
+    },
+
+    createMessageId() {
+        const random = Math.random().toString(36).slice(2, 8);
+        return `msg_${Date.now().toString(36)}_${random}`;
+    },
+
+    createVisibleMessage(role, content, overrides = {}) {
+        const now = Date.now();
+        const outputState = overrides.outputState
+            ? Core.createAiOutputState(overrides.outputState)
+            : null;
+        return {
+            id: overrides.id || this.createMessageId(),
+            role,
+            content: `${content ?? ''}`,
+            rawContent: `${overrides.rawContent ?? content ?? ''}`,
+            outputState,
+            status: overrides.status || 'done',
+            errorKind: overrides.errorKind || null,
+            errorMessage: overrides.errorMessage || '',
+            errorMeta: overrides.errorMeta || null,
+            sourceConfig: Core.normalizeAiSourceConfig(overrides.sourceConfig),
+            excludeFromApi: overrides.excludeFromApi === true,
+            regenerateFromUserId: overrides.regenerateFromUserId || null,
+            createdAt: overrides.createdAt || now,
+            updatedAt: now
+        };
+    },
+
+    hasChatContext() {
+        return Array.isArray(this.chatSession?.baseMessages) && this.chatSession.baseMessages.length > 0;
+    },
+
+    setChatContext({ topicId, start, end, postContent, summaryRawText, summaryContent, coverageReport, sourceConfig }) {
+        const promptChat = GM_getValue('prompt_chat', '');
+        this.chatSession = {
+            context: {
+                topicId,
+                range: { start, end },
+                promptChat,
+                postContent,
+                summary: summaryContent,
+                coverageReport,
+                sourceConfig: Core.normalizeAiSourceConfig(sourceConfig),
+                createdAt: Date.now()
+            },
+            baseMessages: [
+                { role: 'system', content: promptChat },
+                { role: 'user', content: `以下是帖子内容供你参考:\n${postContent}` },
+                { role: 'assistant', content: summaryContent }
+            ],
+            visibleMessages: []
+        };
+        this.chatHistory = [...this.chatSession.baseMessages];
+        this.lastSummary = summaryRawText;
+        this.postContent = postContent;
+        this.closeMessageContextMenu?.();
+    },
+
+    clearChatContext() {
+        this.chatSession = this.createEmptyChatSession();
+        this.chatHistory = [];
+        this.lastSummary = '';
+        this.postContent = '';
+        this.editingMessageId = null;
+        this.editingDraftBefore = '';
+        this.closeMessageContextMenu?.();
+    },
+
+    syncLegacyChatHistory() {
+        const visibleMessages = this.chatSession.visibleMessages
+            .filter(message => message.status === 'done')
+            .map(message => Core.toOpenAiMessage(message))
+            .filter(Boolean);
+        this.chatHistory = [...this.chatSession.baseMessages, ...visibleMessages];
+    },
+
+    findVisibleMessage(messageId) {
+        return this.chatSession.visibleMessages.find(message => message.id === messageId) || null;
+    },
+
+    findVisibleMessageIndex(messageId) {
+        return this.chatSession.visibleMessages.findIndex(message => message.id === messageId);
+    },
+
+    getBubbleElement(messageId) {
+        const list = this.uiManager.Q('#chat-list');
+        if (!list) return null;
+        return Array.from(list.querySelectorAll('[data-message-id]'))
+            .find(el => el.dataset.messageId === messageId) || null;
+    },
+
+    getClosestElement(target, selector) {
+        const element = target?.nodeType === 1 ? target : target?.parentElement;
+        return element?.closest?.(selector) || null;
+    },
+
+    getVisibleMessagesForApi({ throughMessageId = null, beforeMessageId = null, includeExcludedMessageId = null } = {}) {
+        let messages = this.chatSession.visibleMessages
+            .filter(message => message.status === 'done' || message.id === includeExcludedMessageId);
+
+        if (beforeMessageId) {
+            const index = messages.findIndex(message => message.id === beforeMessageId);
+            if (index >= 0) messages = messages.slice(0, index);
+        } else if (throughMessageId) {
+            const index = messages.findIndex(message => message.id === throughMessageId);
+            if (index >= 0) messages = messages.slice(0, index + 1);
+        }
+
+        return messages
+            .filter(message => !message.excludeFromApi || message.id === includeExcludedMessageId)
+            .map(message => Core.toOpenAiMessage(message))
+            .filter(Boolean);
+    },
+
+    buildChatApiMessages(options = {}) {
+        return Core.sanitizeMessagesForApi([
+            ...this.chatSession.baseMessages,
+            ...this.getVisibleMessagesForApi(options)
+        ]);
+    },
+
+    appendVisibleMessage(message) {
+        this.chatSession.visibleMessages.push(message);
+        this.syncLegacyChatHistory();
+        this.updateMessageCount();
+        return message;
+    },
+
+    removeVisibleMessagesFrom(index) {
+        if (index < 0) return [];
+        const removed = this.chatSession.visibleMessages.splice(index);
+        this.syncLegacyChatHistory();
+        this.updateMessageCount();
+        return removed;
+    },
+
+    setVisibleMessage(messageId, patch) {
+        const message = this.findVisibleMessage(messageId);
+        if (!message) return null;
+        Object.assign(message, patch, { updatedAt: Date.now() });
+        this.syncLegacyChatHistory();
+        this.updateMessageCount();
+        return message;
+    },
+
+    renderChatMessages() {
+        const Q = this.uiManager.Q.bind(this.uiManager);
+        const list = Q('#chat-list');
+        list.innerHTML = '';
+        this.chatSession.visibleMessages.forEach(message => this.addBubble(message));
+
+        const empty = Q('#chat-empty');
+        if (this.chatSession.visibleMessages.length > 0) {
+            empty.classList.add('hidden');
+        } else {
+            empty.classList.remove('hidden');
+        }
+        this.updateMessageCount();
+        this.updateScrollButtons();
+    },
+
+    getAssistantForUser(messageId) {
+        const index = this.findVisibleMessageIndex(messageId);
+        if (index < 0) return null;
+        const next = this.chatSession.visibleMessages[index + 1];
+        return next?.role === 'assistant' ? next : null;
+    },
+
+    getUserForAssistant(messageId) {
+        const index = this.findVisibleMessageIndex(messageId);
+        if (index <= 0) return null;
+        for (let i = index - 1; i >= 0; i -= 1) {
+            const message = this.chatSession.visibleMessages[i];
+            if (message.role === 'user') return message;
+        }
+        return null;
+    },
+
+    removeVisibleMessagesAfter(messageId, { includeTarget = false } = {}) {
+        const index = this.findVisibleMessageIndex(messageId);
+        if (index < 0) return [];
+        const start = includeTarget ? index : index + 1;
+        const removed = this.chatSession.visibleMessages.splice(start);
+        this.syncLegacyChatHistory();
+        this.updateMessageCount();
+        return removed;
+    },
+
+    async requestAssistantForUser(userMessage, { assistantMessage = null } = {}) {
+        const Q = this.uiManager.Q.bind(this.uiManager);
+        if (!userMessage || userMessage.role !== 'user') return;
+        if (this.isGenerating) return;
+
+        Q('#chat-empty').classList.add('hidden');
+        this.userScrolledUp = false;
+
+        const targetAssistant = assistantMessage || this.appendVisibleMessage(this.createVisibleMessage('assistant', '', {
+            status: 'streaming',
+            outputState: Core.createAiOutputState(),
+            excludeFromApi: true,
+            regenerateFromUserId: userMessage.id
+        }));
+        this.setVisibleMessage(targetAssistant.id, {
+            content: '',
+            rawContent: '',
+            outputState: Core.createAiOutputState(),
+            status: 'streaming',
+            errorKind: null,
+            errorMessage: '',
+            errorMeta: null,
+            excludeFromApi: true,
+            regenerateFromUserId: userMessage.id
+        });
+        this.renderChatMessages();
+        const msgDiv = this.getBubbleElement(targetAssistant.id);
+
+        const requestSeq = ++this.chatRequestSeq;
+        const outputState = Core.createAiOutputState();
+        this.setLoading('#btn-send', true);
+
+        const messages = this.buildChatApiMessages({
+            throughMessageId: userMessage.id,
+            includeExcludedMessageId: userMessage.id
+        });
+        const abortController = this.startAiAbortController('chat');
+
+        try {
+            await Core.streamChat(messages,
+                (event) => {
+                    if (requestSeq !== this.chatRequestSeq) return;
+                    Core.applyAiOutputEvent(outputState, event);
+                    this.setVisibleMessage(targetAssistant.id, {
+                        rawContent: outputState.contentText,
+                        outputState,
+                        status: 'streaming'
+                    });
+                    const bubble = this.getBubbleElement(targetAssistant.id);
+                    if (bubble) this.scheduleBubbleRender(targetAssistant.id, bubble, () => outputState);
+                },
+                (meta = {}) => {
+                    if (requestSeq !== this.chatRequestSeq) return;
+                    this.cancelBubbleRender(targetAssistant.id);
+                    Core.finishAiOutputState(outputState, meta);
+                    const classified = Core.classifyAiOutput(outputState, meta);
+                    if (classified.kind === 'success') {
+                        const sourceConfig = Core.normalizeAiSourceConfig(meta.sourceConfig);
+                        this.setVisibleMessage(userMessage.id, { excludeFromApi: false });
+                        this.setVisibleMessage(targetAssistant.id, {
+                            content: classified.content,
+                            rawContent: outputState.contentText,
+                            outputState,
+                            status: 'done',
+                            errorKind: null,
+                            errorMessage: '',
+                            errorMeta: null,
+                            sourceConfig,
+                            excludeFromApi: false,
+                            regenerateFromUserId: userMessage.id
+                        });
+                        const bubble = this.getBubbleElement(targetAssistant.id);
+                        if (bubble) this.updateBubble(bubble, outputState, false);
+                    } else {
+                        const failure = Core.createModelOutputFailure(classified, {
+                            operation: 'chat',
+                            sourceConfig: meta.sourceConfig
+                        });
+                        const formatted = Core.formatAiFailureForUi(failure);
+                        this.setVisibleMessage(userMessage.id, { excludeFromApi: true });
+                        this.setVisibleMessage(targetAssistant.id, {
+                            content: classified.content,
+                            rawContent: outputState.contentText,
+                            outputState,
+                            status: 'error',
+                            errorKind: failure.kind,
+                            errorMessage: formatted.detail || formatted.title,
+                            errorMeta: failure,
+                            sourceConfig: failure.sourceConfig,
+                            excludeFromApi: true,
+                            regenerateFromUserId: userMessage.id
+                        });
+                        const bubble = this.getBubbleElement(targetAssistant.id);
+                        if (bubble) this.renderBubbleContent(bubble, this.findVisibleMessage(targetAssistant.id));
+                        this.showToast('回复失败: ' + formatted.toast, 'error');
+                    }
+                },
+                (err) => {
+                    if (requestSeq !== this.chatRequestSeq) return;
+                    this.cancelBubbleRender(targetAssistant.id);
+                    const failure = Core.normalizeAiFailure(err, { operation: 'chat' });
+                    const formatted = Core.formatAiFailureForUi(failure);
+                    Core.markAiOutputFailure(outputState, failure);
+                    this.setVisibleMessage(userMessage.id, { excludeFromApi: true });
+                    this.setVisibleMessage(targetAssistant.id, {
+                        content: outputState.contentText,
+                        rawContent: outputState.contentText,
+                        outputState,
+                        status: 'error',
+                        errorKind: failure.kind || 'request_failed',
+                        errorMessage: formatted.detail || formatted.title,
+                        errorMeta: failure,
+                        sourceConfig: failure.sourceConfig,
+                        excludeFromApi: true,
+                        regenerateFromUserId: userMessage.id
+                    });
+                    const bubble = this.getBubbleElement(targetAssistant.id);
+                    if (bubble) this.renderBubbleContent(bubble, this.findVisibleMessage(targetAssistant.id));
+                    if (!Core.isAiAbortFailure(failure)) {
+                        this.showToast('回复失败: ' + formatted.toast, 'error');
+                    }
+                },
+                { operation: 'chat', signal: abortController.signal }
+            );
+        } finally {
+            if (requestSeq === this.chatRequestSeq) {
+                this.clearAiAbortController(abortController);
+                this.setLoading('#btn-send', false);
+                this.updateChatInputMode();
+                this.userScrolledUp = false;
+                this.updateScrollButtons();
+            }
+        }
+
+        if (msgDiv) this.scrollToBottom();
+    },
+
+    getMessageCopyText(message) {
+        if (!message) return '';
+        if (message.role === 'assistant') {
+            return message.outputState?.contentText || message.content || '';
+        }
+        return message.content || '';
+    },
+
+    renderChatErrorContent(message) {
+        const formatted = message.errorMeta
+            ? Core.formatAiFailureForUi(message.errorMeta, { operation: 'chat' })
+            : null;
+        const title = formatted?.title || (message.errorKind === 'thinking_only'
+            ? 'AI 只返回了推理内容'
+            : message.errorKind === 'empty_response'
+                ? 'AI 返回了空内容'
+                : 'AI 回复失败');
+        const detailText = formatted?.detail || message.errorMessage || '';
+        const hintText = formatted?.hint || '';
+        const detail = detailText ? `<div class="bubble-error-detail">${Core.escapeHtml(detailText)}</div>` : '';
+        const hint = hintText ? `<div class="bubble-error-detail">${Core.escapeHtml(hintText)}</div>` : '';
+        const source = Core.renderAiSourceMeta(message.sourceConfig || formatted?.failure?.sourceConfig);
+        return `
+            <div class="bubble-error-title">${Core.escapeHtml(title)}</div>
+            ${detail}
+            ${hint}
+            ${source}
+            <div class="bubble-error-actions">
+                <button type="button" class="bubble-inline-action" data-chat-action="regenerate" data-message-id="${Core.escapeHtml(message.id)}">重新生成</button>
+                <button type="button" class="bubble-inline-action" data-chat-action="delete" data-message-id="${Core.escapeHtml(message.id)}">删除</button>
+            </div>
+        `;
+    },
+
+    renderBubbleContent(div, message) {
+        const roleClass = message.role === 'assistant' ? 'ai' : 'user';
+        div.className = `bubble bubble-${roleClass}`;
+        div.classList.toggle('bubble-streaming', message.status === 'streaming');
+        div.classList.toggle('bubble-error', message.status === 'error');
+        div.classList.toggle('is-editing', message.id === this.editingMessageId);
+        div.dataset.messageId = message.id;
+        div.dataset.role = message.role;
+        const outputState = message.outputState || Core.normalizeAiOutputState(message.rawContent || message.content);
+        const hasOutput = Boolean(outputState.reasoningText.trim() || outputState.contentText.trim());
+        div.__rawMessageText = outputState.contentText || message.content || '';
+
+        if (message.role === 'user') {
+            div.textContent = message.content ?? '';
+            return;
+        }
+
+        if (message.status === 'error') {
+            const viewState = this.getReasoningPanelViewState(div, outputState, message.id);
+            const preservedOutput = hasOutput
+                ? this.renderWithThinking(outputState, false, viewState)
+                : '';
+            div.innerHTML = preservedOutput + this.renderChatErrorContent(message);
+            return;
+        }
+
+        if (message.status === 'streaming' && !hasOutput) {
+            div.innerHTML = `<div class="thinking"><div class="thinking-dot"></div><div class="thinking-dot"></div><div class="thinking-dot"></div></div>`;
+            return;
+        }
+
+        const source = message.status === 'streaming'
+            ? ''
+            : Core.renderAiSourceMeta(message.sourceConfig);
+        const viewState = this.getReasoningPanelViewState(div, outputState, message.id);
+        div.innerHTML = this.renderWithThinking(outputState, message.status === 'streaming', viewState) + source;
+    },
+
+    bindMessageContextMenu() {
+        const Q = this.uiManager.Q.bind(this.uiManager);
+        const list = Q('#chat-list');
+        const menu = Q('#message-context-menu');
+        if (!list || !menu) return;
+
+        this.addManagedListener(list, 'contextmenu', (e) => {
+            const bubble = this.getClosestElement(e.target, '.bubble[data-message-id]');
+            if (!bubble) return;
+            const selection = window.getSelection?.();
+            if (selection && selection.toString().trim()) return;
+            e.preventDefault();
+            this.openMessageContextMenu(e, bubble.dataset.messageId);
+        });
+
+        this.addManagedListener(menu, 'contextmenu', (e) => e.preventDefault());
+        this.addManagedListener(document, 'pointerdown', (e) => {
+            if (!this.currentMessageMenuId) return;
+            const path = e.composedPath?.() || [];
+            if (path.includes(menu)) return;
+            this.closeMessageContextMenu();
+        }, true);
+        const closeMessageMenuOnFrame = this.createFrameThrottledHandler(() => this.closeMessageContextMenu());
+        this.addManagedListener(window, 'resize', closeMessageMenuOnFrame);
+        this.addManagedListener(window, 'scroll', closeMessageMenuOnFrame, true);
+    },
+
+    bindSummarySelectionMenu() {
+        const Q = this.uiManager.Q.bind(this.uiManager);
+        const resultBox = Q('#summary-result');
+        const menu = Q('#summary-selection-menu');
+        if (!resultBox || !menu) return;
+
+        const scheduleOpen = () => {
+            this.clearManagedTimeout(this.summarySelectionOpenTimerId);
+            const requestSeq = (this.summarySelectionRequestSeq || 0) + 1;
+            this.summarySelectionRequestSeq = requestSeq;
+            this.summarySelectionOpenTimerId = this.setManagedTimeout(() => {
+                this.summarySelectionOpenTimerId = null;
+                if (requestSeq !== this.summarySelectionRequestSeq) return;
+                const selectionState = this.getSummarySelectionState();
+                if (selectionState) {
+                    this.openSummarySelectionMenu(selectionState);
+                } else {
+                    this.closeSummarySelectionMenu();
+                }
+            }, 40);
+        };
+
+        this.addManagedListener(resultBox, 'mouseup', scheduleOpen);
+        this.addManagedListener(resultBox, 'keyup', scheduleOpen);
+        this.addManagedListener(resultBox, 'touchend', scheduleOpen);
+        const closeSummarySelectionOnFrame = this.createFrameThrottledHandler(() => this.closeSummarySelectionMenu());
+        this.addManagedListener(resultBox, 'scroll', closeSummarySelectionOnFrame, { passive: true });
+        this.addManagedListener(menu, 'mousedown', (e) => e.preventDefault());
+        this.addManagedListener(menu, 'pointerdown', (e) => e.preventDefault());
+        this.addManagedListener(document, 'pointerdown', (e) => {
+            if (!this.currentSummarySelection) return;
+            const path = e.composedPath?.() || [];
+            if (path.includes(menu)) return;
+            this.closeSummarySelectionMenu();
+        }, true);
+        this.addManagedListener(window, 'resize', closeSummarySelectionOnFrame);
+        this.addManagedListener(window, 'scroll', closeSummarySelectionOnFrame, true);
+    },
+
+    getCurrentSelection() {
+        return this.uiManager.shadow?.getSelection?.() || window.getSelection?.() || null;
+    },
+
+    clearCurrentSelection() {
+        const selections = [
+            this.uiManager.shadow?.getSelection?.(),
+            window.getSelection?.()
+        ].filter(Boolean);
+        const seen = new Set();
+        selections.forEach((selection) => {
+            if (seen.has(selection) || typeof selection.removeAllRanges !== 'function') return;
+            seen.add(selection);
+            selection.removeAllRanges();
+        });
+    },
+
+    getSummarySelectionState() {
+        const Q = this.uiManager.Q.bind(this.uiManager);
+        const resultBox = Q('#summary-result');
+        if (!resultBox || this.currentTab !== 'summary' || !this.hasChatContext()) return null;
+
+        const selection = this.getCurrentSelection();
+        if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
+        if (!Core.isSummarySelectionTextUseful(selection.toString())) return null;
+
+        const range = selection.getRangeAt(0);
+        if (!this.isSummarySelectionRangeAllowed(range, resultBox)) return null;
+
+        const rect = this.getSelectionAnchorRect(range);
+        if (!rect) return null;
+
+        const normalized = Core.normalizeSummarySelectionText(selection.toString());
+        return {
+            text: normalized.text,
+            truncated: normalized.truncated,
+            rect: {
+                left: rect.left,
+                right: rect.right,
+                top: rect.top,
+                bottom: rect.bottom,
+                width: rect.width,
+                height: rect.height
+            }
+        };
+    },
+
+    isSummarySelectionRangeAllowed(range, resultBox) {
+        if (!range || !resultBox) return false;
+        const startNode = range.startContainer?.nodeType === 1 ? range.startContainer : range.startContainer?.parentElement;
+        const endNode = range.endContainer?.nodeType === 1 ? range.endContainer : range.endContainer?.parentElement;
+        const commonNode = range.commonAncestorContainer?.nodeType === 1
+            ? range.commonAncestorContainer
+            : range.commonAncestorContainer?.parentElement;
+        if (!startNode || !endNode || !commonNode) return false;
+        if (!resultBox.contains(startNode) || !resultBox.contains(endNode) || !resultBox.contains(commonNode)) return false;
+
+        const excludedSelectors = [
+            '.result-actions',
+            '#btn-copy-summary',
+            '.summary-coverage',
+            '.thinking-header',
+            '[data-thinking-toggle]',
+            '#summary-selection-menu',
+            '.summary-selection-menu'
+        ];
+        return !excludedSelectors.some((selector) => (
+            this.getClosestElement(startNode, selector)
+            || this.getClosestElement(endNode, selector)
+            || this.getClosestElement(commonNode, selector)
+        ));
+    },
+
+    getSelectionAnchorRect(range) {
+        const rects = Array.from(range.getClientRects?.() || [])
+            .filter((rect) => rect && rect.width > 0 && rect.height > 0);
+        if (rects.length > 0) return rects[Math.floor((rects.length - 1) / 2)];
+        const rect = range.getBoundingClientRect?.();
+        if (rect && rect.width > 0 && rect.height > 0) return rect;
+        return null;
+    },
+
+    openSummarySelectionMenu(selectionState) {
+        const menu = this.uiManager.Q('#summary-selection-menu');
+        if (!menu || !selectionState?.text) return;
+        this.closeMessageContextMenu?.();
+        this.currentSummarySelection = selectionState;
+        menu.classList.add('show');
+        menu.setAttribute('aria-hidden', 'false');
+        this.positionSummarySelectionMenu(menu, selectionState.rect);
+    },
+
+    positionSummarySelectionMenu(menu, anchorRect) {
+        const sidebar = this.uiManager.Q('#sidebar');
+        if (!sidebar || !anchorRect) return;
+        menu.style.visibility = 'hidden';
+        menu.style.left = '0px';
+        menu.style.top = '0px';
+
+        const gap = 8;
+        const sidebarRect = sidebar.getBoundingClientRect();
+        const maxWidth = Math.max(180, sidebarRect.width - gap * 2);
+        menu.style.maxWidth = `${maxWidth}px`;
+
+        const menuW = Math.min(menu.offsetWidth || 260, maxWidth);
+        const menuH = menu.offsetHeight || 46;
+        const centerX = anchorRect.left + anchorRect.width / 2 - sidebarRect.left;
+        const aboveY = anchorRect.top - sidebarRect.top - menuH - gap;
+        const belowY = anchorRect.bottom - sidebarRect.top + gap;
+        const minX = gap;
+        const maxX = Math.max(minX, sidebarRect.width - menuW - gap);
+        const minY = gap;
+        const maxY = Math.max(minY, sidebarRect.height - menuH - gap);
+        const x = Math.max(minX, Math.min(centerX - menuW / 2, maxX));
+        const preferredY = aboveY >= minY ? aboveY : belowY;
+        const y = Math.max(minY, Math.min(preferredY, maxY));
+
+        menu.style.left = `${x}px`;
+        menu.style.top = `${y}px`;
+        menu.style.visibility = '';
+    },
+
+    closeSummarySelectionMenu() {
+        this.summarySelectionRequestSeq = (this.summarySelectionRequestSeq || 0) + 1;
+        this.clearManagedTimeout(this.summarySelectionOpenTimerId);
+        this.summarySelectionOpenTimerId = null;
+        const menu = this.uiManager.Q('#summary-selection-menu');
+        if (menu) {
+            menu.classList.remove('show');
+            menu.setAttribute('aria-hidden', 'true');
+        }
+        this.currentSummarySelection = null;
+    },
+
+    openMessageContextMenu(event, messageId) {
+        const Q = this.uiManager.Q.bind(this.uiManager);
+        const menu = Q('#message-context-menu');
+        const message = this.findVisibleMessage(messageId);
+        if (!menu || !message) return;
+
+        this.currentMessageMenuId = messageId;
+        const canMutate = !this.isGenerating && message.status !== 'streaming';
+        menu.querySelectorAll('[data-message-menu-action]').forEach((button) => {
+            const action = button.dataset.messageMenuAction;
+            let disabled = false;
+            if (action === 'copy') disabled = !this.getMessageCopyText(message).trim();
+            if (action === 'edit') disabled = !canMutate || (message.role === 'assistant' && message.status !== 'done');
+            if (action === 'regenerate') disabled = !canMutate || !this.getRegenerateUserMessage(message);
+            if (action === 'delete') disabled = !canMutate;
+            button.disabled = disabled;
+        });
+
+        menu.classList.add('show');
+        menu.setAttribute('aria-hidden', 'false');
+        this.positionMessageContextMenu(menu, event);
+    },
+
+    positionMessageContextMenu(menu, event) {
+        const sidebar = this.uiManager.Q('#sidebar');
+        if (!sidebar) return;
+        menu.style.visibility = 'hidden';
+        menu.style.left = '0px';
+        menu.style.top = '0px';
+
+        const gap = 8;
+        const sidebarRect = sidebar.getBoundingClientRect();
+        const maxWidth = Math.max(120, Math.min(240, sidebarRect.width - gap * 2));
+        menu.style.maxWidth = `${maxWidth}px`;
+
+        const menuW = Math.min(menu.offsetWidth || 160, maxWidth);
+        const menuH = menu.offsetHeight || 150;
+        const minX = gap;
+        const maxX = Math.max(minX, sidebarRect.width - menuW - gap);
+        const minY = gap;
+        const maxY = Math.max(minY, sidebarRect.height - menuH - gap);
+        const localX = event.clientX - sidebarRect.left;
+        const localY = event.clientY - sidebarRect.top;
+        const x = Math.max(minX, Math.min(localX, maxX));
+        const y = Math.max(minY, Math.min(localY, maxY));
+
+        menu.style.left = `${x}px`;
+        menu.style.top = `${y}px`;
+        menu.style.visibility = '';
+    },
+
+    closeMessageContextMenu() {
+        const menu = this.uiManager.Q('#message-context-menu');
+        if (menu) {
+            menu.classList.remove('show');
+            menu.setAttribute('aria-hidden', 'true');
+        }
+        this.currentMessageMenuId = null;
+    },
+
+    handleMessageMenuAction(action, messageId) {
+        if (!action || !messageId) return;
+        if (action === 'copy') return this.copyMessage(messageId);
+        if (action === 'edit') return this.startEditMessage(messageId);
+        if (action === 'regenerate') return this.regenerateMessage(messageId);
+        if (action === 'delete') return this.deleteMessage(messageId);
+    },
+
+    async handleSummarySelectionAction(action) {
+        const selection = this.currentSummarySelection;
+        if (!selection?.text) return;
+        if (!this.hasChatContext()) {
+            this.closeSummarySelectionMenu();
+            return this.showToast('请先完成总结', 'error');
+        }
+        if (this.editingMessageId) {
+            this.closeSummarySelectionMenu();
+            return this.showToast('正在编辑消息，请先完成或取消编辑', 'error');
+        }
+
+        const promptSpec = Core.buildSummarySelectionPrompt(action, selection.text);
+        if (!promptSpec.prompt.trim()) {
+            this.closeSummarySelectionMenu();
+            return this.showToast('选区内容为空', 'error');
+        }
+
+        const input = this.uiManager.Q('#chat-input');
+        const hasDraft = !!input?.value.trim();
+        const shouldAutoSend = promptSpec.autoSend && !this.isGenerating && !hasDraft;
+        this.closeSummarySelectionMenu();
+        this.clearCurrentSelection();
+        this.switchTab('chat');
+        this.fillChatInputWithSelectionPrompt(promptSpec.prompt);
+        if (selection.truncated || promptSpec.truncated) {
+            this.showToast('选区较长，已截取前 2000 字');
+        } else if (promptSpec.autoSend && hasDraft) {
+            this.showToast('已有输入草稿，已追加选区内容');
+        } else if (!shouldAutoSend) {
+            this.showToast('已带入对话输入框');
+        }
+
+        if (promptSpec.autoSend && this.isGenerating) {
+            this.showToast('当前正在生成，已先填入输入框');
+            return;
+        }
+        if (shouldAutoSend) await this.doChat();
+    },
+
+    fillChatInputWithSelectionPrompt(prompt) {
+        const input = this.uiManager.Q('#chat-input');
+        if (!input) return;
+        const current = input.value.trim();
+        input.value = current
+            ? `${current}\n\n---\n${prompt}`
+            : prompt;
+        input.style.height = 'auto';
+        input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+        input.focus();
+    },
+
+    copyMessage(messageId) {
+        const message = this.findVisibleMessage(messageId);
+        const text = this.getMessageCopyText(message);
+        if (!text.trim()) return this.showToast('没有可复制的内容', 'error');
+        this.copyToClipboard(text);
+        this.closeMessageContextMenu();
+    },
+
+    startEditMessage(messageId) {
+        if (this.isGenerating) return this.showToast('生成中不能编辑消息', 'error');
+        const message = this.findVisibleMessage(messageId);
+        if (!message || message.status === 'streaming') return;
+        if (message.role === 'assistant' && message.status !== 'done') return this.showToast('失败回复不能直接编辑，请重新生成', 'error');
+
+        const input = this.uiManager.Q('#chat-input');
+        this.closeMessageContextMenu();
+        this.editingMessageId = messageId;
+        this.editingDraftBefore = input.value;
+        input.value = message.role === 'assistant' ? (message.content || '') : (message.content || '');
+        input.style.height = 'auto';
+        input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+        this.renderChatMessages();
+        this.updateChatInputMode();
+        input.focus();
+        this.showToast('编辑后按 Enter 保存，Esc 取消');
+    },
+
+    async confirmEditMessage() {
+        const input = this.uiManager.Q('#chat-input');
+        const message = this.findVisibleMessage(this.editingMessageId);
+        if (!message) return this.cancelEditMessage();
+
+        const nextContent = input.value.trim();
+        if (!nextContent) return this.showToast('编辑内容不能为空', 'error');
+        if (this.isGenerating) return;
+
+        const messageId = message.id;
+        const isUser = message.role === 'user';
+        this.setVisibleMessage(messageId, {
+            content: nextContent,
+            rawContent: nextContent,
+            status: 'done',
+            errorKind: null,
+            errorMessage: '',
+            excludeFromApi: isUser
+        });
+        this.removeVisibleMessagesAfter(messageId);
+
+        this.editingMessageId = null;
+        this.editingDraftBefore = '';
+        input.value = '';
+        input.style.height = 'auto';
+        this.updateChatInputMode();
+        this.renderChatMessages();
+
+        if (isUser) {
+            await this.requestAssistantForUser(this.findVisibleMessage(messageId));
+        } else {
+            this.showToast('已更新回复内容');
+        }
+    },
+
+    cancelEditMessage() {
+        const input = this.uiManager.Q('#chat-input');
+        if (input) {
+            input.value = this.editingDraftBefore || '';
+            input.style.height = 'auto';
+            input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+        }
+        this.editingMessageId = null;
+        this.editingDraftBefore = '';
+        this.updateChatInputMode();
+        this.renderChatMessages();
+    },
+
+    getRegenerateUserMessage(message) {
+        if (!message) return null;
+        if (message.role === 'user') return message;
+        if (message.regenerateFromUserId) {
+            const source = this.findVisibleMessage(message.regenerateFromUserId);
+            if (source?.role === 'user') return source;
+        }
+        return this.getUserForAssistant(message.id);
+    },
+
+    async regenerateMessage(messageId) {
+        if (this.isGenerating) return this.showToast('生成中不能重新生成', 'error');
+        const message = this.findVisibleMessage(messageId);
+        const userMessage = this.getRegenerateUserMessage(message);
+        if (!message || !userMessage) return this.showToast('未找到可重新生成的问题', 'error');
+
+        this.closeMessageContextMenu();
+        if (message.role === 'assistant') {
+            this.removeVisibleMessagesAfter(message.id, { includeTarget: true });
+        } else {
+            this.removeVisibleMessagesAfter(message.id);
+        }
+        this.renderChatMessages();
+        await this.requestAssistantForUser(userMessage);
+    },
+
+    deleteMessage(messageId) {
+        if (this.isGenerating) return this.showToast('生成中不能删除消息', 'error');
+        const message = this.findVisibleMessage(messageId);
+        if (!message) return;
+
+        this.closeMessageContextMenu();
+        if (this.editingMessageId === messageId) this.cancelEditMessage();
+        if (message.role === 'assistant') {
+            const userMessage = this.getUserForAssistant(message.id);
+            if (userMessage) this.setVisibleMessage(userMessage.id, { excludeFromApi: true });
+        }
+        this.removeVisibleMessagesAfter(messageId, { includeTarget: true });
+        this.renderChatMessages();
+        if (this.chatSession.visibleMessages.length === 0) {
+            const empty = this.uiManager.Q('#chat-empty');
+            empty.classList.remove('hidden');
+            empty.innerHTML = '<span class="tip-icon">💬</span>对话已清空<br>可以继续基于帖子内容提问';
+        }
+        this.showToast('消息已删除');
+    },
+
+    refreshSummaryCache() {
+        const Q = this.uiManager.Q.bind(this.uiManager);
+        const tid = Core.getTopicId();
+        const start = Q('#inp-start').value;
+        const end = Q('#inp-end').value;
+
+        if (!tid) return this.showToast('未检测到帖子ID', 'error');
+        if (!start || !end || parseInt(start) > parseInt(end)) {
+            Core.clearTopicDataCache(tid);
+            this.forceRefreshDialogueCache = true;
+            return this.showToast('下次总结将重新获取楼层内容', 'success');
+        }
+
+        Core.clearDialogueCache(tid, parseInt(start), parseInt(end));
+        Core.clearTopicDataCache(tid);
+        this.forceRefreshDialogueCache = true;
+        this.showToast('下次总结将重新获取楼层内容', 'success');
+    },
+
+    async doSummary() {
+        const Q = this.uiManager.Q.bind(this.uiManager);
+        const tid = Core.getTopicId();
+        if (!tid) return this.showToast('未检测到帖子ID', 'error');
+        if (!await this.waitForRangeConfirmation('summary')) return;
+        let start = parseInt(Q('#inp-start').value, 10);
+        let end = parseInt(Q('#inp-end').value, 10);
+        if (!start) {
+            start = 1;
+            Q('#inp-start').value = start;
+        }
+        if (!end) {
+            try {
+                end = await this.getRangeUpperBound({ forceRefresh: true, allowDomFallback: false });
+            } catch (e) {
+                return this.showToast(`获取最新楼层失败: ${e.message || e}`, 'error');
+            }
+            if (end) Q('#inp-end').value = end;
+        }
+        if (!start || !end || start > end) return this.showToast('楼层范围无效', 'error');
+
+        this.clearChatContext();
+        Q('#chat-list').innerHTML = '';
+        Q('#chat-empty').classList.remove('hidden');
+        Q('#chat-empty').innerHTML = '<span class="tip-icon">💬</span>请先完成本次总结，<br>然后即可基于新上下文进行对话';
+        this.updateMessageCount();
+        this.setLoading('#btn-summary', true);
+        const resultBox = Q('#summary-result');
+        resultBox.classList.remove('empty');
+        this.summaryUserScrolledUp = false;
+        this.isSummaryProgrammaticScroll = false;
+        resultBox.scrollTop = 0;
+        resultBox.innerHTML = `<div style="display:flex;align-items:center;gap:10px;"><div class="thinking"><div class="thinking-dot"></div><div class="thinking-dot"></div><div class="thinking-dot"></div></div>正在获取帖子内容...</div>`;
+        this.updateSummaryScrollButton();
+
+        try {
+            const forceRefresh = this.forceRefreshDialogueCache === true;
+            this.forceRefreshDialogueCache = false;
+            const { text, cacheHit, cacheEntry, rangeMapping } = await Core.fetchDialoguesCached(tid, start, end, (progress) => {
+                const progressText = Core.escapeHtml(Core.getFetchProgressText(progress, '帖子内容'));
+                resultBox.innerHTML = `<div style="display:flex;align-items:center;gap:10px;"><div class="thinking"><div class="thinking-dot"></div><div class="thinking-dot"></div><div class="thinking-dot"></div></div>${progressText}</div>`;
+                this.updateSummaryScrollButton();
+            }, {
+                forceRefresh
+            });
+            if (!text) throw new Error('未获取到内容');
+            this.postContent = text;
+            const coverageReport = Core.buildSummaryCoverageReport({
+                topicId: tid,
+                start,
+                end,
+                cacheHit,
+                cacheEntry,
+                rangeMapping
+            });
+            resultBox.innerHTML = `<div style="display:flex;align-items:center;gap:10px;"><div class="thinking"><div class="thinking-dot"></div><div class="thinking-dot"></div><div class="thinking-dot"></div></div>${cacheHit ? '已复用楼层缓存，AI 正在重新分析中...' : 'AI 正在分析中...'}</div>`;
+            this.updateSummaryScrollButton();
+
+            const messages = [
+                { role: 'system', content: GM_getValue('prompt_sum', '') },
+                { role: 'user', content: `帖子内容:\n${text}` }
+            ];
+
+            const outputState = Core.createAiOutputState();
+            const abortController = this.startAiAbortController('summary');
+            await Core.streamChat(messages,
+                (event) => {
+                    Core.applyAiOutputEvent(outputState, event);
+                    this.scheduleSummaryRender(resultBox, () => outputState);
+                },
+                (meta = {}) => {
+                    this.cancelSummaryRender();
+                    Core.finishAiOutputState(outputState, meta);
+                    const classified = Core.classifyAiOutput(outputState, meta);
+                    if (classified.kind !== 'success') {
+                        const failure = Core.createModelOutputFailure(classified, {
+                            operation: 'summary',
+                            sourceConfig: meta.sourceConfig
+                        });
+                        const formatted = Core.formatAiFailureForUi(failure);
+                        this.clearAiAbortController(abortController);
+                        this.setLoading('#btn-summary', false);
+                        const hasOutput = Boolean(outputState.reasoningText.trim() || outputState.contentText.trim());
+                        if (hasOutput) {
+                            this.updateResultBox(resultBox, outputState, false, coverageReport, failure.sourceConfig, failure);
+                        } else {
+                            resultBox.innerHTML = Core.renderAiFailureBlock(failure, { operation: 'summary' });
+                        }
+                        this.updateSummaryScrollButton();
+                        this.showToast('总结失败: ' + formatted.toast, 'error');
+                        return;
+                    }
+                    const sourceConfig = Core.normalizeAiSourceConfig(meta.sourceConfig);
+                    this.clearAiAbortController(abortController);
+                    this.setLoading('#btn-summary', false);
+                    this.updateResultBox(resultBox, outputState, false, coverageReport, sourceConfig);
+                    this.setChatContext({
+                        topicId: tid,
+                        start,
+                        end,
+                        postContent: text,
+                        summaryRawText: outputState.contentText,
+                        summaryContent: classified.content,
+                        coverageReport,
+                        sourceConfig
+                    });
+                    this.renderChatMessages();
+                    Q('#chat-empty').classList.remove('hidden');
+                    Q('#chat-empty').innerHTML = '<span class="tip-icon">✅</span>总结已完成！<br>现在可以基于帖子内容进行对话';
+                },
+                (err) => {
+                    this.cancelSummaryRender();
+                    const failure = Core.normalizeAiFailure(err, { operation: 'summary' });
+                    const formatted = Core.formatAiFailureForUi(failure);
+                    const wasAborted = Core.isAiAbortFailure(failure);
+                    Core.markAiOutputFailure(outputState, failure);
+                    const hasOutput = Boolean(outputState.reasoningText.trim() || outputState.contentText.trim());
+                    if (hasOutput) {
+                        this.updateResultBox(resultBox, outputState, false, coverageReport, failure.sourceConfig, failure);
+                    } else {
+                        resultBox.innerHTML = Core.renderAiFailureBlock(failure, { operation: 'summary' });
+                        this.updateSummaryScrollButton();
+                    }
+                    this.clearAiAbortController(abortController);
+                    this.setLoading('#btn-summary', false);
+                    if (!wasAborted) {
+                        this.showToast('总结失败: ' + formatted.toast, 'error');
+                    }
+                },
+                { operation: 'summary', signal: abortController.signal }
+            );
+        } catch (e) {
+            resultBox.innerHTML = `<div style="color:var(--danger)">❌ 错误: ${Core.escapeHtml(e.message || e)}</div>`;
+            this.updateSummaryScrollButton();
+            this.setLoading('#btn-summary', false);
+        }
+    },
+
+    async doChat() {
+        const Q = this.uiManager.Q.bind(this.uiManager);
+        if (this.isGenerating) return;
+        if (this.editingMessageId) return this.confirmEditMessage();
+        if (!this.hasChatContext()) return this.showToast('请先生成总结', 'error');
+
+        const input = Q('#chat-input');
+        const txt = input.value.trim();
+        if (!txt) return;
+
+        input.value = '';
+        input.style.height = 'auto';
+        Q('#chat-empty').classList.add('hidden');
+        this.userScrolledUp = false;
+
+        const userMessage = this.appendVisibleMessage(this.createVisibleMessage('user', txt, { excludeFromApi: true }));
+        this.renderChatMessages();
+        await this.requestAssistantForUser(userMessage);
+    },
+
+    //
+};

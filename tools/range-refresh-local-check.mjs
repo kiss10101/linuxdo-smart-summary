@@ -2,6 +2,7 @@
 
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { normalizeCodeWhitespace, readProjectSource } from './source-test-helper.mjs';
 
 function normalizeVersion(value, fallback = '7.7-alpha.9') {
   return String(value || fallback).trim().replace(/^v/i, '');
@@ -10,15 +11,17 @@ function normalizeVersion(value, fallback = '7.7-alpha.9') {
 const version = normalizeVersion(process.argv[2]);
 const repoRoot = process.cwd();
 const distPath = resolve(repoRoot, `dist/Linux.do 智能总结-${version}.user.js`);
-const text = await readFile(distPath, 'utf8');
+const distArtifact = await readFile(distPath, 'utf8');
+const text = await readProjectSource(repoRoot);
+const normalizedText = normalizeCodeWhitespace(text);
 const failures = [];
 
 function expectIncludes(needle, label) {
-  if (!text.includes(needle)) failures.push(`${label}: missing ${needle}`);
+  if (!normalizedText.includes(normalizeCodeWhitespace(needle))) failures.push(`${label}: missing ${needle}`);
 }
 
 function expectNotIncludes(needle, label) {
-  if (text.includes(needle)) failures.push(`${label}: unexpected ${needle}`);
+  if (normalizedText.includes(normalizeCodeWhitespace(needle))) failures.push(`${label}: unexpected ${needle}`);
 }
 
 function expectMatch(pattern, label) {
@@ -32,7 +35,7 @@ function extractFunction(name) {
   return text.slice(start, nextMarker > start ? nextMarker : start + 2500);
 }
 
-expectIncludes(`// @version      ${version}`, 'userscript version');
+if (!distArtifact.includes(`// @version      ${version}`)) failures.push('userscript version: missing metadata version');
 
 expectIncludes('topicDataInflight: new Map()', 'topic metadata in-flight registry');
 expectIncludes('topicDataPrewarmPolicy', 'topic metadata prewarm policy');
@@ -103,12 +106,12 @@ expectIncludes("this.restoreOptimisticRange('export', optimistic);", 'export ran
 expectIncludes('forceRefreshTopicData: options.forceRefreshTopicData === true || options.forceRefresh === true', 'dialogue force refresh also refreshes topic metadata');
 expectIncludes('forceRefresh: options.forceRefreshTopicData === true', 'post fetch can force topic metadata refresh');
 
-expectIncludes('let activeTopicId = null;', 'active topic id tracking');
-expectIncludes('let activeTopicPrewarmTimer = null;', 'active topic prewarm timer');
+expectIncludes('activeTopicId: null', 'active topic id tracking');
+expectIncludes('activeTopicPrewarmTimer: null', 'active topic prewarm timer');
 expectIncludes('scheduleActiveTopicPrewarm', 'route and resume topic prewarm scheduler');
 expectIncludes('const topicId = Core.getTopicId();', 'route sync reads current topic id');
-expectIncludes('topicId && activeTopicId && topicId !== activeTopicId', 'same-page topic switch detection');
-expectIncludes('activeUIManager.destroy();\n                activeTopicId = topicId;\n                activeUIManager = new UIManager();', 'topic switch rebuilds sidebar');
+expectIncludes('topicId && uiRuntime.activeTopicId && topicId !== uiRuntime.activeTopicId', 'same-page topic switch detection');
+expectIncludes('uiRuntime.activeUIManager.destroy();\n        uiRuntime.activeTopicId = topicId;\n        uiRuntime.activeUIManager = new UIManager();', 'topic switch rebuilds sidebar');
 expectIncludes("scheduleActiveTopicPrewarm('route')", 'topic route creation schedules prewarm');
 expectIncludes("scheduleActiveTopicPrewarm('route-change')", 'topic switch schedules prewarm');
 expectIncludes("scheduleActiveTopicPrewarm('resume', Core.topicDataPrewarmPolicy.resumeDelayMs)", 'visible/focus resume schedules prewarm');
@@ -116,7 +119,7 @@ expectIncludes("Core.prewarmTopicData(topicId, { reason })", 'route prewarm uses
 expectIncludes("document.addEventListener('visibilitychange', scheduleResumePrewarm);", 'visibility resume listener installed');
 expectIncludes("window.addEventListener('focus', scheduleResumePrewarm);", 'focus resume listener installed');
 expectIncludes("document.removeEventListener('visibilitychange', scheduleResumePrewarm);", 'visibility resume listener cleaned up');
-expectIncludes('activeTopicId = null;', 'leaving topic page clears active topic id');
+expectIncludes('uiRuntime.activeTopicId = null;', 'leaving topic page clears active topic id');
 
 expectNotIncludes('Q(\'#range-all\').onclick = () => this.setRange(\'all\');\n            Q(\'#range-recent\').onclick = () => this.setRange(\'recent\');\n            Q(\'#btn-summary\').onclick', 'range buttons should keep manual input tracking between binding and summary button');
 expectMatch(/\.btn-xs:disabled,\s*\.btn-xs\.loading\s*\{[\s\S]*?cursor:\s*wait;/, 'range buttons expose loading cursor');

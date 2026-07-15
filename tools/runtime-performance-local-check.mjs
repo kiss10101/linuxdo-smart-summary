@@ -2,6 +2,7 @@
 
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { normalizeCodeWhitespace, readProjectSource } from './source-test-helper.mjs';
 
 function normalizeVersion(value, fallback = '7.7-alpha.9') {
   return String(value || fallback).trim().replace(/^v/i, '');
@@ -10,15 +11,17 @@ function normalizeVersion(value, fallback = '7.7-alpha.9') {
 const version = normalizeVersion(process.argv[2]);
 const repoRoot = process.cwd();
 const distPath = resolve(repoRoot, `dist/Linux.do 智能总结-${version}.user.js`);
-const text = await readFile(distPath, 'utf8');
+const distArtifact = await readFile(distPath, 'utf8');
+const text = await readProjectSource(repoRoot);
+const normalizedText = normalizeCodeWhitespace(text);
 const failures = [];
 
 function expectIncludes(needle, label) {
-  if (!text.includes(needle)) failures.push(`${label}: missing ${needle}`);
+  if (!normalizedText.includes(normalizeCodeWhitespace(needle))) failures.push(`${label}: missing ${needle}`);
 }
 
 function expectNotIncludes(needle, label) {
-  if (text.includes(needle)) failures.push(`${label}: unexpected ${needle}`);
+  if (normalizedText.includes(normalizeCodeWhitespace(needle))) failures.push(`${label}: unexpected ${needle}`);
 }
 
 function expectMatch(pattern, label) {
@@ -48,9 +51,9 @@ expectIncludes('closeSummarySelectionOnFrame', 'summary menu scroll close is thr
 
 expectIncludes('Core.isTopicPage()', 'topic route gate');
 expectIncludes('installTopicRouteBootstrap', 'SPA route bootstrap');
-expectIncludes('activeUIManager = new UIManager();', 'UIManager is created through gated boot');
-expectIncludes('activeUIManager.destroy();', 'UIManager is destroyed after leaving topic routes');
-expectIncludes('destroy() {\n            if (this.currentUI', 'UIManager exposes destroy lifecycle');
+expectIncludes('uiRuntime.activeUIManager = new UIManager();', 'UIManager is created through gated boot');
+expectIncludes('uiRuntime.activeUIManager.destroy();', 'UIManager is destroyed after leaving topic routes');
+expectIncludes('destroy() {\n    if (this.currentUI', 'UIManager exposes destroy lifecycle');
 expectNotIncludes("window.addEventListener('load', () => {\n        new UIManager();", 'unconditional load initialization');
 
 expectIncludes('topicDataPrewarmPolicy', 'topic metadata prewarm policy');
@@ -59,13 +62,13 @@ expectIncludes("this.fetchTopicData(key, this.getLinuxDoFetchOptions({ noStore: 
 expectIncludes("return { skipped: 'hidden' };", 'topic metadata prewarm skips hidden pages');
 expectIncludes("return { skipped: 'throttled', lastAttemptAt: state.lastAttemptAt };", 'topic metadata prewarm is throttled');
 expectIncludes('const forceInflightKey = `${key}:force`;', 'normal topic fetch reuses force prewarm');
-expectIncludes('let activeTopicPrewarmTimer = null;', 'topic prewarm timer state');
+expectIncludes('activeTopicPrewarmTimer: null', 'topic prewarm timer state');
 expectIncludes('clearActiveTopicPrewarmTimer();', 'topic prewarm timer cleanup');
 expectIncludes("document.removeEventListener('visibilitychange', scheduleResumePrewarm);", 'visibility prewarm listener cleanup');
 expectIncludes("window.removeEventListener('focus', scheduleResumePrewarm);", 'focus prewarm listener cleanup');
 
 const prewarmStart = text.indexOf('async prewarmTopicData(topicId, options = {})');
-const prewarmEnd = text.indexOf('\n        getTopicBoundsFromTopicData', prewarmStart);
+const prewarmEnd = text.indexOf('\n    getTopicBoundsFromTopicData', prewarmStart);
 const prewarmBlock = prewarmStart >= 0 && prewarmEnd > prewarmStart ? text.slice(prewarmStart, prewarmEnd) : '';
 if (!prewarmBlock) {
   failures.push('topic metadata prewarm block: missing');

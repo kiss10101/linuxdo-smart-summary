@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "7.7-alpha.9",
+    [string]$Version = "7.8.0-alpha.1",
     [switch]$All,
     [switch]$SkipVerify
 )
@@ -8,6 +8,21 @@ $ErrorActionPreference = "Stop"
 
 $repo = "kiss10101/linuxdo-smart-summary"
 $releases = @(
+    @{
+        Tag          = "v7.8.0-alpha.1"
+        Name         = "v7.8.0-alpha.1"
+        AssetPattern = "*7.8.0-alpha.1.user.js"
+        AssetName    = "linuxdo-smart-summary-7.8.0-alpha.1.user.js"
+        Prerelease   = $true
+        Body         = @"
+7.8.0-alpha.1 modular source and deterministic build preview.
+
+- Moves maintainable runtime code into 27 responsibility-oriented ES modules while preserving one-file Tampermonkey installation.
+- Adds a locked esbuild pipeline, direct source tests, generated-artifact verification, and read-only pull-request CI.
+- Makes model-list requests cancellable and time-bounded, with controls restored after every terminal path.
+- Uses the short migration route 7.8.0-alpha.1 -> 7.8.0-beta.1 -> 7.8.0.
+"@
+    },
     @{
         Tag          = "v7.7-alpha.9"
         Name         = "v7.7-alpha.9"

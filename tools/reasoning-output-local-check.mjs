@@ -5,9 +5,10 @@ import { resolve } from 'node:path';
 import {
   createJsonResponse,
   createStreamingResponse,
-  loadUserscriptCore,
+  loadSourceCore,
   splitUtf8ByPattern
 } from './userscript-core-test-helper.mjs';
+import { readProjectSource } from './source-test-helper.mjs';
 
 function normalizeVersion(value, fallback = '7.7-alpha.9') {
   return String(value || fallback).trim().replace(/^v/i, '');
@@ -83,7 +84,8 @@ const repoRoot = process.cwd();
 const fixture = JSON.parse(await readFile(resolve(repoRoot, fixturePath), 'utf8'));
 const distPath = resolve(repoRoot, `dist/Linux.do 智能总结-${version}.user.js`);
 const distText = await readFile(distPath, 'utf8');
-const { Core, context } = loadUserscriptCore(distText);
+const sourceText = await readProjectSource(repoRoot);
+const { Core, context } = loadSourceCore();
 
 assertContains(distText, `// @version      ${version}`, 'userscript version');
 
@@ -142,10 +144,10 @@ for (const testCase of fixture.finishCases || []) {
 }
 
 for (const fragment of fixture.uiShape?.requiredContains || []) {
-  assertContains(distText, fragment, `UI/security shape ${fragment}`);
+  assertContains(sourceText, fragment, `UI/security source shape ${fragment}`);
 }
 for (const fragment of fixture.uiShape?.forbiddenContains || []) {
-  assertNotContains(distText, fragment, `UI/security shape ${fragment}`);
+  assertNotContains(sourceText, fragment, `UI/security source shape ${fragment}`);
 }
 
 const streamingPreview = Core.renderReasoningPreview('<img src="https://tracker.example/pixel">\n<script>alert(1)</script>');

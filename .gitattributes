@@ -4,4 +4,6 @@
 *.json text eol=lf
 *.md text eol=lf
 *.ps1 text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
 *.user.js text eol=lf

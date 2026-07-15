@@ -2,6 +2,7 @@
 
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { readProjectSource } from './source-test-helper.mjs';
 
 function normalizeVersion(value, fallback = '7.7-alpha.9') {
   return String(value || fallback).trim().replace(/^v/i, '');
@@ -36,24 +37,25 @@ function assertForbidden(block, forbidden, label) {
 
 const version = normalizeVersion(process.argv[2]);
 const distPath = resolve(process.cwd(), `dist/Linux.do 智能总结-${version}.user.js`);
-const distText = await readFile(distPath, 'utf8');
+const distArtifact = await readFile(distPath, 'utf8');
+const distText = await readProjectSource();
 
-assertContains(distText, `// @version      ${version}`, 'userscript version');
-assertContains(distText, '@grant        GM_addValueChangeListener', 'value listener grant');
-assertContains(distText, '@grant        GM_removeValueChangeListener', 'value listener cleanup grant');
-assertNotContains(distText, '@grant        GM_xmlhttpRequest', 'no GM network helper');
+assertContains(distArtifact, `// @version      ${version}`, 'userscript version');
+assertContains(distArtifact, '@grant        GM_addValueChangeListener', 'value listener grant');
+assertContains(distArtifact, '@grant        GM_removeValueChangeListener', 'value listener cleanup grant');
+assertNotContains(distArtifact, '@grant        GM_xmlhttpRequest', 'no GM network helper');
 if (version === '7.7-alpha.3') {
-  assertContains(distText, `${version}: 增加 AI-only 停止生成`, 'update summary');
+  assertContains(distArtifact, `${version}: 增加 AI-only 停止生成`, 'update summary');
 } else if (version === '7.7-alpha.4') {
-  assertContains(distText, `${version}: 修复 UI 重建后跨标签设置监听未重绑`, 'update summary');
+  assertContains(distArtifact, `${version}: 修复 UI 重建后跨标签设置监听未重绑`, 'update summary');
 } else if (version === '7.7-alpha.5') {
-  assertContains(distText, `${version}: 修正对话/总结阅读区的跳转按钮定位`, 'update summary');
+  assertContains(distArtifact, `${version}: 修正对话/总结阅读区的跳转按钮定位`, 'update summary');
 } else if (version === '7.7-alpha.6') {
-  assertContains(distText, `${version}: 修复对话页实际由外层内容区滚动`, 'update summary');
+  assertContains(distArtifact, `${version}: 修复对话页实际由外层内容区滚动`, 'update summary');
 } else if (version === '7.7-alpha.7') {
-  assertContains(distText, `${version}: 公开仓库隐私与供应链加固`, 'update summary');
+  assertContains(distArtifact, `${version}: 公开仓库隐私与供应链加固`, 'update summary');
 } else {
-  assertContains(distText, `* ${version}:`, 'update summary');
+  assertContains(distArtifact, `* ${version}:`, 'update summary');
 }
 
 const streamBlock = getBlock(

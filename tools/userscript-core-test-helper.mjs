@@ -1,37 +1,16 @@
-import vm from 'node:vm';
+import { Core as SourceCore } from '../src/core/index.js';
 
-const CORE_START = '    const Core = {';
-const CORE_END = '\n    };\n\n    // =================================================================================\n    // 3. UI';
-
-export function loadUserscriptCore(source, globals = {}) {
-  const text = String(source || '');
-  const declarationStart = text.indexOf(CORE_START);
-  if (declarationStart < 0) throw new Error('userscript Core declaration not found');
-
-  const objectStart = text.indexOf('{', declarationStart);
-  const objectEndMarker = text.indexOf(CORE_END, objectStart);
-  if (objectEndMarker < 0) throw new Error('userscript Core declaration end not found');
-
-  const objectSource = text.slice(objectStart, objectEndMarker + '\n    }'.length);
-  const context = vm.createContext({
-    console,
+export function loadSourceCore(globals = {}) {
+  Object.assign(globalThis, {
     TextDecoder,
     TextEncoder,
     URL,
     AbortController,
     Blob,
-    CONFIG: {
-      defaultApiUrl: 'https://provider.example/v1/chat/completions',
-      defaultModel: 'fixture-model'
-    },
     GM_getValue: (_key, fallback) => fallback,
     ...globals
   });
-  const Core = new vm.Script(`(${objectSource})`, {
-    filename: 'userscript-core.fixture.js'
-  }).runInContext(context);
-  context.Core = Core;
-  return { Core, context };
+  return { Core: SourceCore, context: globalThis };
 }
 
 export function splitUtf8ByPattern(text, sizes = [1, 2, 3, 5, 8]) {

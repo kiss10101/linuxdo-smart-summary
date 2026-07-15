@@ -1,5 +1,14 @@
 # Changelog
 
+## 7.8.0-alpha.1
+
+- Migrates the maintainable implementation from one userscript file into 27 responsibility-oriented ES modules under `src/`, while continuing to publish one Tampermonkey-compatible file under `dist/`.
+- Adds a deterministic esbuild pipeline, a committed lockfile, direct source-module tests, generated-output verification, and a source architecture gate.
+- Moves legacy regression checks from bundle formatting assumptions to source behavior and module contracts.
+- Makes model-list requests cancellable, enforces a 15-second timeout, and restores both model-fetch buttons after success, failure, timeout, modal close, or UI teardown.
+- Escapes provider and topic-derived status text and normalizes export filenames before inserting them into UI or download paths.
+- Keeps the migration release route deliberately short: `7.8.0-alpha.1 -> 7.8.0-beta.1 -> 7.8.0`.
+
 ## 7.7-alpha.9
 
 - Separates provider-returned reasoning from answer content throughout streaming and non-streaming response handling instead of serializing reasoning into synthetic `<think>` markup.

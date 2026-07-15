@@ -1,0 +1,57 @@
+// ==UserScript==
+// @name         Linux.do 智能总结
+// @namespace    http://tampermonkey.net/
+// @version      __VERSION__
+// @description  Linux.do 帖子总结与导出，支持多种UI风格切换，集成HTML离线导出和AI文本导出功能。
+// @author       半杯无糖、WolfHolo、LD Export
+// @match        https://linux.do/*
+// @icon         https://linux.do/uploads/default/original/4X/c/c/d/ccd8c210609d498cbeb3d5201d4c259348447562.png
+// @require      https://cdn.jsdelivr.net/npm/marked@18.0.6/lib/marked.umd.js#sha384-uGn1eBC40GtuBgao0epc/cz9O4Lo8/flg/10SW+69UjLI5nP31iT4UPc65Xz10Le
+// @require      https://cdn.jsdelivr.net/npm/dompurify@3.4.12/dist/purify.min.js#sha384-piCcpDdJ7qVeK4Tv8Z6Hpcr3ZBIgP16TxQTPVfsLFdZ5uDgwc3Y8Ho7oUnqf12qu
+// @grant        GM_setValue
+// @grant        GM_getValue
+// @grant        GM_addValueChangeListener
+// @grant        GM_removeValueChangeListener
+// @grant        GM_setClipboard
+// @grant        GM_registerMenuCommand
+// @grant        GM_download
+// @license      MIT
+// ==/UserScript==
+
+// Generated from src/ by tools/build-userscript.mjs. Do not edit dist directly.
+
+/*
+ * 更新摘要
+ * Upstream: GreasyFork script 558028, publisher Passerby1011; original metadata author 半杯无糖、WolfHolo、LD Export; MIT license.
+ * __VERSION__: 将脚本迁移为多文件源码与确定性单文件构建；按 AI、Discourse、内容、导出和 UI 职责拆分模块，并建立源码测试、生成物校验与 CI 发布门禁。
+ * 7.7-alpha.9: 将服务商返回的推理内容与最终回答改为独立状态；流式/非流式不再拼接伪 <think> 标签，保留截断、中止和失败前的部分输出，并以可访问的折叠面板安全展示推理内容。
+ * 7.7-alpha.8: 加固 HTML 转纯文本和公开 fixture URL 隐私门禁；在总结/追问的 AI 上下文中保留主贴与回复的 created_at ISO 时间戳，不改变 Linux.do 请求策略。
+ * 7.7-alpha.7: 公开仓库隐私与供应链加固；测试数据改为合成内容，固定 marked/DOMPurify 版本与完整性哈希，不改变 Linux.do 请求策略。
+ * 7.7-alpha.6: 修复对话页实际由外层内容区滚动、导致对话滑块仍在右侧的问题；将对话消息区设为唯一纵向滚动容器，并恢复悬浮跳转按钮到右侧。
+ * 7.7-alpha.5: 修正对话/总结阅读区的跳转按钮定位：与左侧滚动条对齐到左侧，避免悬浮控件仍停在右侧。
+ * 7.7-alpha.4: 修复 UI 重建后跨标签设置监听未重绑和无修改焦点阻塞同步；总结/对话增加统一的跳到最新内容控制，并将主阅读区滚动条移到左侧。
+ * 7.7-alpha.3: 增加 AI-only 停止生成、请求来源配置快照和跨标签设置同步；同步只刷新本地设置 UI，不新增 Linux.do 请求。
+ * 7.7-alpha.2: AI 和模型列表请求失败时展示上游 HTTP 状态、错误码和简短说明；识别流式错误、非 JSON 响应和 finish_reason 异常。
+ * 7.7-alpha.1: 优化“全部/最近”楼层范围响应；预热 topic JSON 元数据、支持缓存乐观填入，并保持最终最高楼层由 no-store topic JSON 确认。
+ * 7.6: 正式稳定版，整合 7.6 预览线的总结选区快捷操作、短选区触发、运行时节流、API 配置档案、楼层范围强制刷新和 Edge 148 兼容确认。
+ * 7.6-alpha.6: “全部/最近”楼层范围改为显式刷新最高楼层并显示获取状态；API 配置改为可点击档案列表，切换、编辑、新增、复制、删除后立即持久化生效。
+ * 7.6-alpha.5: API 配置支持多个档案列表切换，可新增、复制、删除配置，并兼容迁移旧版 API 地址、Key 和模型设置。
+ * 7.6-alpha.4: 取消总结选区快捷菜单的最少字数门槛；短词、缩写、用户名、楼层号等有意义短选区也可触发菜单。
+ * 7.6-alpha.3: 稳定总结选区快捷菜单生命周期，避免重复选区操作后旧延迟任务、残留 selection 或聊天生成状态影响下一次唤起。
+ * 7.6-alpha.2: 修复流式输出高频整段重绘、非主题页无条件初始化、拖拽/滚动高频事件和大范围请求缺少总预算保护的问题。
+ * 7.6-alpha.1: 总结结果支持选中文本后弹出快捷操作条，可将选区带入对话页进行解释、追问或局部总结；不新增 Linux.do 请求。
+ * 7.5: 稳定发布 7.5-alpha.6；保留 7.5 系列楼层范围、boosts、对话和引用归因修复，并降低缓存清理定时器与 HTML 文本解析的运行时开销。
+ * 7.5-alpha.6: 保留 Discourse 引用/跨主题转发链接的来源用户、主题、楼层和标题，避免 AI 把引用内容误归因给当前楼层作者。
+ * 7.5-alpha.5: 修复右侧侧边栏中聊天消息右键菜单可能被定位到屏幕外的问题，并增强事件目标兼容性。
+ * 7.5-alpha.4: 重构总结后对话状态，识别 AI 空回与思考-only；对用户/AI 消息增加右键菜单，支持复制、编辑、重新生成和删除，并避免 UI 元数据进入 AI 请求。
+ * 7.5-alpha.3: 修复全帖/最近快捷范围把右侧时间线计数误当最高楼层的问题；改用 Discourse topic JSON 的 highest_post_number，并让总结与导出共享短时 topic 数据。
+ * 7.5-alpha.2: 统一 Linux.do/Discourse topic 路由解析；总结完成后展示楼层覆盖、缓存、回看校准和元数据纳入情况；补充发布前版本一致性检查。
+ * 7.5-alpha.1: 支持读取 Linux.do/Discourse boosts 字段，在 AI 总结上下文、HTML 导出和 AI 文本导出中展示帖子 boost 信息，不新增 Linux.do 请求。
+ * 7.4: 稳定发布 7.4-alpha.4；将 Linux.do posts 拉取回调为每批 200、串行低频请求；增加当前标签页楼层内容短暂缓存，AI 空回或失败后可重试而不重复拉取楼层。
+ * 7.4-alpha.4: 将 Linux.do posts 拉取回调为每批 200、串行低频请求；增加当前标签页楼层内容短暂缓存，AI 空回或失败后可重试而不重复拉取楼层。
+ * 7.4-alpha.3: 保留回帖关系元数据；当被回复楼层已删除或不可见时，在总结和导出中标记回复目标楼层。
+ * 7.4-alpha.2: 发布 7.4 修复版；按 post_number 输出用户选择范围，并在发现 stream 下标偏移时用受控回看窗口校准。
+ * 7.4-alpha.1: 建立并实装楼层范围映射修复基线。
+ * 7.3: 优化 Linux.do 帖子数据请求策略，改用 topic stream + 小批量 posts 拉取；默认每批 40 条、并发 2、批次启动间隔 250ms，并补充基础响应校验。
+ * 7.2: API 配置支持获取模型列表；模型名称可从侧栏弹窗选择，也可手动输入；修复用户聊天输入直接写入 innerHTML 的安全问题。
+ */

@@ -2,6 +2,7 @@
 
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { readProjectSource } from './source-test-helper.mjs';
 
 function normalizeVersion(value, fallback = '7.7-alpha.9') {
   return String(value || fallback).trim().replace(/^v/i, '');
@@ -43,10 +44,11 @@ function getBlock(text, startPattern, endPattern, label) {
 
 const version = normalizeVersion(process.argv[2]);
 const distPath = resolve(process.cwd(), `dist/Linux.do 智能总结-${version}.user.js`);
-const distText = await readFile(distPath, 'utf8');
+const distArtifact = await readFile(distPath, 'utf8');
+const distText = await readProjectSource();
 
-assertContains(distText, `// @version      ${version}`, 'userscript version');
-assertContains(distText, '7.7-alpha.2: AI 和模型列表请求失败时展示上游 HTTP 状态', 'upstream error update summary');
+assertContains(distArtifact, `// @version      ${version}`, 'userscript version');
+assertContains(distArtifact, '7.7-alpha.2: AI 和模型列表请求失败时展示上游 HTTP 状态', 'upstream error update summary');
 
 for (const helper of [
   'sanitizeErrorText(value, maxChars = 500)',
@@ -102,7 +104,7 @@ if (/GM_getValue\('api(Key|Url)'/.test(streamBlock) || /GM_getValue\('model'/.te
 
 const modelBlock = getBlock(
   distText,
-  /async fetchModelList\(apiUrl, apiKey\)\s*\{/,
+  /async fetchModelList\(apiUrl, apiKey, options = \{\}\)\s*\{/,
   /\n\s*\/\/ ========== 导出功能相关工具函数 ==========/,
   'fetchModelList block'
 );
@@ -112,10 +114,17 @@ assertContains(modelBlock, '未从响应中解析到模型列表', 'model list e
 assertContains(modelBlock, 'rawSnippet: this.sanitizeErrorText(bodyText, 500)', 'model list safe body snippet');
 
 assertCountAtLeast(distText, 'this.modelListRequestSeq = 0;', 2, 'style1/style2 model picker sequence state');
-assertContains(distText, 'this.modelListRequestSeq = (this.modelListRequestSeq || 0) + 1;', 'model picker close invalidates requests');
+assertCountAtLeast(distText, 'this.modelListAbortController = null;', 2, 'style1/style2 model picker abort state');
+assertCountAtLeast(distText, 'this.modelListTimeoutId = null;', 2, 'style1/style2 model picker timeout state');
+assertContains(distText, 'signal: options.signal', 'model list request accepts an abort signal');
+assertContains(distText, 'cancelModelListRequest()', 'model picker exposes request cancellation');
+assertContains(distText, 'this.clearManagedTimeout(this.modelListTimeoutId);', 'model picker cancellation clears timeout immediately');
+assertContains(distText, 'this.modelListRequestSeq = (this.modelListRequestSeq || 0) + 1;', 'model picker cancellation invalidates requests');
 assertContains(distText, 'const requestSeq = (this.modelListRequestSeq || 0) + 1;', 'model picker request sequence allocation');
 assertCountAtLeast(distText, 'if (requestSeq !== this.modelListRequestSeq) return;', 2, 'model picker stale success/error guard');
 assertContains(distText, 'if (requestSeq === this.modelListRequestSeq) {', 'model picker stale finally guard');
+assertContains(distText, 'this.setModelListLoading(false);', 'model picker always restores button state');
+assertContains(distText, '获取模型列表超时', 'model picker timeout feedback');
 assertContains(distText, 'status.textContent = message;', 'model picker status safe text sink');
 assertContains(distText, 'btn.textContent = model;', 'model option safe text sink');
 

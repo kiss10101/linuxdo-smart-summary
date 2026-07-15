@@ -3,14 +3,17 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
-function normalizeVersion(value, fallback = '7.7-alpha.9') {
+const packageJson = JSON.parse(readFileSync('package.json', 'utf8'));
+
+function normalizeVersion(value, fallback = packageJson.version) {
   return String(value || fallback).trim().replace(/^v/i, '');
 }
 
 const version = normalizeVersion(process.argv[2]);
 const manifest = JSON.parse(readFileSync('tools/release-manifest.json', 'utf8'));
+const release = manifest.releases.find((item) => item.version === version);
 const userscriptVersions = [...new Set([manifest.stable, version].filter(Boolean))];
-const previewFeatureChecks = version.startsWith('7.7-')
+const currentFeatureChecks = release?.validationProfile === 'current' || version === packageJson.version
   ? [
       ['tools/ai-upstream-errors-local-check.mjs', version],
       ['tools/reasoning-output-local-check.mjs', 'fixtures/reasoning-output.fixture.json', version],
@@ -45,6 +48,12 @@ const commands = [
   ['--check', 'tools/verify-release.mjs'],
   ['--check', 'tools/check-all.mjs'],
   ['--check', 'tools/public-repository-local-check.mjs'],
+  ['--check', 'tools/source-architecture-local-check.mjs'],
+  ['--check', 'tools/source-test-helper.mjs'],
+  ['--check', 'tools/migrate-userscript-source.mjs'],
+  ['--check', 'tools/build-userscript.mjs'],
+  ['--check', 'tools/verify-generated-dist.mjs'],
+  ['--check', 'tools/bundle-runtime-smoke-local-check.mjs'],
   ['tools/range-mapping-local-check.mjs', 'fixtures/post-stream-gap.fixture.json'],
   ['tools/reply-relation-local-check.mjs', 'fixtures/reply-relation.fixture.json'],
   ['tools/fetch-posts-batch-local-check.mjs', 'fixtures/fetch-posts-batch.fixture.json'],
@@ -54,12 +63,19 @@ const commands = [
   ['tools/summary-selection-local-check.mjs', 'fixtures/summary-selection.fixture.json', version],
   ['tools/html-to-text-local-check.mjs', 'fixtures/html-to-text.fixture.json', version],
   ['tools/post-timestamps-local-check.mjs', 'fixtures/post-timestamps.fixture.json', version],
-  ...previewFeatureChecks,
+  ...currentFeatureChecks,
   ['tools/quote-attribution-local-check.mjs', 'fixtures/quote-attribution.fixture.json'],
   ['tools/boosts-local-check.mjs', 'fixtures/boosts.fixture.json'],
   ['tools/topic-identity-local-check.mjs', 'fixtures/topic-identity.fixture.json'],
   ['tools/topic-bounds-local-check.mjs', 'fixtures/topic-bounds.fixture.json'],
   ['tools/public-repository-local-check.mjs', version],
+  ...(version === packageJson.version
+    ? [
+        ['tools/source-architecture-local-check.mjs', version],
+        ['tools/verify-generated-dist.mjs'],
+        ['tools/bundle-runtime-smoke-local-check.mjs', version]
+      ]
+    : []),
   ['tools/verify-release.mjs', version]
 ];
 

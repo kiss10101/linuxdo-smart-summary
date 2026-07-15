@@ -1,0 +1,21 @@
+{
+  "name": "linuxdo-smart-summary",
+  "version": "7.8.0-alpha.1",
+  "private": true,
+  "type": "module",
+  "description": "Modular source and deterministic userscript build for Linux.do Smart Summary.",
+  "scripts": {
+    "build": "node tools/build-userscript.mjs",
+    "build:check": "node tools/verify-generated-dist.mjs",
+    "test:source": "node --test \"tests/*.test.mjs\"",
+    "test:dist": "node tools/check-all.mjs",
+    "test": "npm run test:source && npm run test:dist",
+    "verify": "npm run build:check && npm test"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.1"
+  }
+}
