@@ -8,9 +8,15 @@ test('Core composes summary-selection behavior from source modules', () => {
   assert.equal(Core.isSummarySelectionTextUseful('AI'), true);
   assert.equal(Core.isSummarySelectionTextUseful('，。'), false);
 
-  const prompt = Core.buildSummarySelectionPrompt('ask', '继续追问');
-  assert.equal(prompt.autoSend, false);
-  assert.match(prompt.prompt, /我的问题是：/);
+  const simplify = Core.buildSummarySelectionPrompt('simplify', '继续精简');
+  assert.equal(simplify.autoSend, true);
+  assert.equal(simplify.action, 'simplify');
+  assert.match(simplify.prompt, /更短、更清晰/);
+
+  const quote = Core.buildSummarySelectionPrompt('quote', '引用片段');
+  assert.equal(quote.autoSend, false);
+  assert.equal(quote.action, 'quote');
+  assert.match(quote.prompt, /^> 引用片段/);
 });
 
 test('Core keeps post timestamps stable in AI context', () => {

@@ -114,7 +114,7 @@ assertContains(distText, 'getActiveApiProfileIndex: UIRegistry.get', 'style2 sha
 
 const style1SettingsBlock = getBlock(
   distText,
-  /<div id="page-settings" class="view-page settings-page">/,
+  /<div id="page-settings" class="view-page settings-page"[^>]*>/,
   /\$\{this\.getMessageContextMenuHtml\(\)\}/,
   'style1 settings block'
 );
@@ -122,7 +122,7 @@ assertSettingsOrder(style1SettingsBlock, 'style1 settings block');
 
 const style2SettingsBlock = getBlock(
   distText.slice(distText.indexOf("UIRegistry.register('style2'")),
-  /<div id="page-settings" class="view-page settings-page">/,
+  /<div id="page-settings" class="view-page settings-page"[^>]*>/,
   /\$\{this\.getMessageContextMenuHtml\(\)\}/,
   'style2 settings block'
 );

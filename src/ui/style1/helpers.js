@@ -243,7 +243,7 @@ export const style1Helpers = {
             bubbleDiv.__rawMessageText = state.contentText;
             message.rawContent = state.contentText;
             message.outputState = state;
-            if (message.status !== 'error') {
+            if (message.status !== 'error' && message.status !== 'stopped') {
                 const roleClass = message.role === 'assistant' ? 'ai' : 'user';
                 bubbleDiv.className = `bubble bubble-${roleClass}`;
                 bubbleDiv.classList.toggle('bubble-streaming', isStreaming);
@@ -256,6 +256,7 @@ export const style1Helpers = {
         } else {
             bubbleDiv.innerHTML = this.renderWithThinking(state, isStreaming, viewState);
         }
+        if (message) this.ensureMessageMenuTrigger?.(bubbleDiv, message);
         if (GM_getValue('autoScroll', true) && viewState.expansion === 'user-expanded') {
             this.setManagedTimeout(() => {
                 const thinkingInner = bubbleDiv.querySelector('.thinking-content-inner');

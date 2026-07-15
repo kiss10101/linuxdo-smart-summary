@@ -70,7 +70,7 @@ export const style1Presentation = {
     .icon-btn[data-tooltip]::after { content: attr(data-tooltip); position: absolute; bottom: -32px; left: 50%; transform: translateX(-50%) scale(0.9); background: var(--text-main); color: var(--text-inverse); padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 500; white-space: nowrap; opacity: 0; pointer-events: none; transition: all var(--transition-fast); z-index: 100; }
     .icon-btn[data-tooltip]:hover::after { opacity: 1; transform: translateX(-50%) scale(1); }
     .tab-bar { display: flex; padding: 12px 16px; gap: 6px; border-bottom: 1px solid var(--border-light); background: var(--bg-glass); flex-shrink: 0; }
-    .tab-item { flex: 1; padding: 12px 16px; text-align: center; font-size: 13px; font-weight: 600; color: var(--text-sec); cursor: pointer; border-radius: var(--radius-sm); transition: all var(--transition-fast); display: flex; align-items: center; justify-content: center; gap: 8px; position: relative; overflow: hidden; }
+    .tab-item { flex: 1; padding: 12px 16px; text-align: center; font: inherit; font-size: 13px; font-weight: 600; color: var(--text-sec); cursor: pointer; border: none; border-radius: var(--radius-sm); background: transparent; transition: all var(--transition-fast); display: flex; align-items: center; justify-content: center; gap: 8px; position: relative; overflow: hidden; }
     .tab-item::before { content: ''; position: absolute; inset: 0; background: var(--primary-gradient); opacity: 0; transition: opacity var(--transition-fast); }
     .tab-item:hover { color: var(--primary); background: var(--bg-hover); }
     .tab-item.active { color: var(--text-inverse); background: var(--primary-gradient); box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255,255,255,0.2); }
@@ -150,22 +150,28 @@ export const style1Presentation = {
     .bubble-ai p:last-child { margin-bottom: 0; }
     .bubble.is-editing { outline: 2px solid var(--primary); outline-offset: 3px; }
     .bubble-error { border-color: var(--danger) !important; background: var(--danger-light) !important; color: var(--text-main) !important; }
+    .bubble-stopped { border-style: dashed; }
     .bubble-error-title { font-weight: 700; color: var(--danger); margin-bottom: 6px; }
     .bubble-error-detail { color: var(--text-sec); font-size: 12px; line-height: 1.6; margin-bottom: 10px; }
     .bubble-error-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
     .bubble-inline-action { padding: 6px 10px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-main); font: inherit; font-size: 12px; cursor: pointer; }
     .bubble-inline-action:hover { border-color: var(--primary); color: var(--primary); background: var(--bg-hover); }
+    .message-menu-trigger { position: absolute; top: 6px; right: 6px; width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border-light); border-radius: var(--radius-sm); background: var(--bg-glass); color: var(--text-sec); font: inherit; font-size: 18px; line-height: 1; cursor: pointer; opacity: 0; pointer-events: none; transition: opacity var(--transition-fast), color var(--transition-fast), background-color var(--transition-fast); }
+    .bubble:hover > .message-menu-trigger, .bubble:focus-within > .message-menu-trigger, .message-menu-trigger[aria-expanded="true"] { opacity: 1; pointer-events: auto; }
+    .message-menu-trigger:hover { color: var(--primary); background: var(--bg-card); }
     .message-context-menu { position: absolute; z-index: 10003; min-width: 150px; max-width: 240px; padding: 6px; display: none; background: var(--bg-glass); border: 1px solid var(--border-light); border-radius: var(--radius-md); box-shadow: var(--shadow-xl); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
     .message-context-menu.show { display: block; }
-    .message-menu-item { width: 100%; min-height: 34px; padding: 8px 10px; border: none; border-radius: var(--radius-sm); background: transparent; color: var(--text-main); font: inherit; font-size: 13px; font-weight: 600; text-align: left; cursor: pointer; }
+    .message-menu-item { width: 100%; min-height: 40px; padding: 8px 10px; border: none; border-radius: var(--radius-sm); background: transparent; color: var(--text-main); font: inherit; font-size: 13px; font-weight: 600; text-align: left; cursor: pointer; }
+    .message-menu-item[hidden] { display: none; }
     .message-menu-item:hover:not(:disabled) { background: var(--primary); color: var(--text-inverse); }
     .message-menu-item.danger { color: var(--danger); }
     .message-menu-item.danger:hover:not(:disabled) { background: var(--danger); color: var(--text-inverse); }
     .message-menu-item:disabled { opacity: 0.45; cursor: not-allowed; }
     .summary-selection-menu { position: absolute; z-index: 10004; display: none; flex-wrap: wrap; align-items: center; gap: 6px; max-width: calc(100% - 16px); padding: 7px; background: var(--bg-glass); border: 1px solid var(--border-light); border-radius: var(--radius-md); box-shadow: var(--shadow-xl); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
     .summary-selection-menu.show { display: flex; }
-    .summary-selection-item { min-height: 32px; padding: 7px 11px; border: none; border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-main); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; box-shadow: inset 0 0 0 1px var(--border-light); transition: all var(--transition-fast); }
+    .summary-selection-item { min-height: 40px; padding: 8px 12px; border: none; border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-main); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; box-shadow: inset 0 0 0 1px var(--border-light); transition: color var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast); }
     .summary-selection-item:hover { background: var(--primary); color: var(--text-inverse); box-shadow: inset 0 0 0 1px transparent; }
+    #toggle-btn:focus-visible, .tab-item:focus-visible, .icon-btn:focus-visible, .message-menu-trigger:focus-visible, .message-menu-item:focus-visible, .summary-selection-item:focus-visible { outline: 3px solid var(--primary-light); outline-offset: 2px; }
     .bubble-ai code { background: var(--bg-hover); padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.85em; }
     .bubble-ai .thinking-block { margin: -6px -8px 12px; border-radius: var(--radius-sm); }
     .bubble-ai .thinking-block:last-child { margin-bottom: -6px; }
@@ -325,6 +331,12 @@ export const style1Presentation = {
     .toast { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--text-main); color: var(--text-inverse); padding: 12px 20px; border-radius: var(--radius-md); font-size: 12px; font-weight: 500; box-shadow: var(--shadow-lg); z-index: 10000; opacity: 0; pointer-events: none; transition: all var(--transition-normal); display: flex; align-items: center; gap: 8px; max-width: 90%; text-align: center; }
     .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
     .toast.error { background: var(--danger); }
+    @media (hover: none), (pointer: coarse) {
+        .message-menu-trigger { opacity: 1; pointer-events: auto; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+    }
         `;
     },
 
@@ -336,7 +348,7 @@ export const style1Presentation = {
 
         const html = `
             <!-- 悬浮按钮 -->
-            <div id="toggle-btn" title="拖动改变位置，点击展开/关闭 (Ctrl+Shift+S)">${arrowLeft}</div>
+            <button type="button" id="toggle-btn" title="拖动改变位置，点击展开/关闭 (Ctrl+Shift+S)" aria-label="打开智能总结侧栏" aria-expanded="false" aria-controls="sidebar">${arrowLeft}</button>
             <!-- 侧边栏 -->
             <div class="sidebar-panel" id="sidebar">
                 <div class="resize-handle" id="resizer"></div>
@@ -362,21 +374,21 @@ export const style1Presentation = {
                         智能总结
                     </div>
                     <div class="header-actions">
-                        <button class="icon-btn" id="btn-theme" data-tooltip="切换主题">🌙</button>
-                        <button class="icon-btn" id="btn-close" data-tooltip="关闭">✕</button>
+                        <button type="button" class="icon-btn" id="btn-theme" data-tooltip="切换主题" aria-label="切换明暗主题">🌙</button>
+                        <button type="button" class="icon-btn" id="btn-close" data-tooltip="关闭" aria-label="关闭智能总结侧栏">✕</button>
                     </div>
                 </div>
                 <!-- Tab 导航 -->
-                <div class="tab-bar">
-                    <div class="tab-item active" data-tab="summary"><span>📝 总结</span></div>
-                    <div class="tab-item" data-tab="chat"><span>💬 对话</span></div>
-                    <div class="tab-item" data-tab="export"><span>📦 导出</span></div>
-                    <div class="tab-item" data-tab="settings"><span>⚙️ 设置</span></div>
+                <div class="tab-bar" role="tablist" aria-label="智能总结功能">
+                    <button type="button" id="tab-summary" class="tab-item active" data-tab="summary" role="tab" aria-selected="true" aria-controls="page-summary"><span>📝 总结</span></button>
+                    <button type="button" id="tab-chat" class="tab-item" data-tab="chat" role="tab" aria-selected="false" aria-controls="page-chat" tabindex="-1"><span>💬 对话</span></button>
+                    <button type="button" id="tab-export" class="tab-item" data-tab="export" role="tab" aria-selected="false" aria-controls="page-export" tabindex="-1"><span>📦 导出</span></button>
+                    <button type="button" id="tab-settings" class="tab-item" data-tab="settings" role="tab" aria-selected="false" aria-controls="page-settings" tabindex="-1"><span>⚙️ 设置</span></button>
                 </div>
                 <!-- 内容区 -->
                 <div class="content-area">
                     <!-- 总结页面 -->
-                    <div id="page-summary" class="view-page active">
+                    <div id="page-summary" class="view-page active" role="tabpanel" aria-labelledby="tab-summary">
                         <div class="form-group">
                             <div class="range-header">
                                 <label class="form-label" style="margin:0;">楼层范围</label>
@@ -413,7 +425,7 @@ export const style1Presentation = {
                         </div>
                     </div>
                     <!-- 对话页面 -->
-                    <div id="page-chat" class="view-page">
+                    <div id="page-chat" class="view-page" role="tabpanel" aria-labelledby="tab-chat" hidden>
                         <div class="chat-container">
                             <div class="chat-toolbar">
                                 <div class="chat-toolbar-title">
@@ -448,7 +460,7 @@ export const style1Presentation = {
                         </div>
                     </div>
                     <!-- 导出页面 -->
-                    <div id="page-export" class="view-page">
+                    <div id="page-export" class="view-page" role="tabpanel" aria-labelledby="tab-export" hidden>
                         <div class="form-group">
                             <label class="form-label">导出类型</label>
                             <select id="export-type">
@@ -533,7 +545,7 @@ export const style1Presentation = {
                         </div>
                     </div>
                     <!-- 设置页面 -->
-                    <div id="page-settings" class="view-page settings-page">
+                    <div id="page-settings" class="view-page settings-page" role="tabpanel" aria-labelledby="tab-settings" hidden>
                         <div class="settings-group">
                             <div class="settings-group-title">API 配置</div>
                             <div class="setting-item">

@@ -76,6 +76,11 @@ export const style1Events = {
             btn.style.cursor = 'grabbing';
             e.preventDefault();
         });
+        this.addManagedListener(btn, 'keydown', (e) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            e.preventDefault();
+            this.toggleSidebar();
+        });
 
         this.addManagedListener(window, 'mousemove', (e) => {
             if (!isDrag) return;
@@ -116,13 +121,29 @@ export const style1Events = {
             const tab = this.getClosestElement(e.target, '.tab-item');
             if (tab) this.switchTab(tab.dataset.tab);
         });
+        this.addManagedListener(Q('.tab-bar'), 'keydown', (e) => {
+            const tab = this.getClosestElement(e.target, '.tab-item');
+            if (!tab) return;
+            const tabs = Array.from(Q('.tab-bar').querySelectorAll('.tab-item'));
+            const currentIndex = tabs.indexOf(tab);
+            let nextIndex = currentIndex;
+            if (e.key === 'ArrowRight') nextIndex = (currentIndex + 1) % tabs.length;
+            if (e.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+            if (e.key === 'Home') nextIndex = 0;
+            if (e.key === 'End') nextIndex = tabs.length - 1;
+            if (nextIndex === currentIndex) return;
+            e.preventDefault();
+            const nextTab = tabs[nextIndex];
+            this.switchTab(nextTab.dataset.tab);
+            nextTab.focus();
+        });
 
         let isResizing = false;
         let pendingResizeEvent = null;
         let resizeFrameId = null;
         const applyResizeMove = () => {
             resizeFrameId = null;
-            if (!isResizing || !pendingResizeEvent) return;
+            if (!isResizing || !pendingResizeEvent || this.isNarrowViewport?.()) return;
             const e = pendingResizeEvent;
             pendingResizeEvent = null;
             let newW = this.side === 'right' ? (window.innerWidth - e.clientX) : e.clientX;
@@ -136,6 +157,7 @@ export const style1Events = {
             }
         };
         this.addManagedListener(Q('#resizer'), 'mousedown', (e) => {
+            if (this.isNarrowViewport?.()) return;
             isResizing = true;
             pendingResizeEvent = null;
             document.body.style.cursor = 'col-resize';
@@ -229,6 +251,8 @@ export const style1Events = {
             });
         }, { passive: true });
         this.addManagedListener(window, 'resize', this.createFrameThrottledHandler(() => {
+            this.squeezeBody(this.isOpen);
+            this.updateButtonPosition(false);
             this.updateScrollButtons();
             this.updateSummaryScrollButton();
         }));

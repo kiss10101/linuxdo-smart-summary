@@ -1,5 +1,15 @@
 # Changelog
 
+## 7.8.0-alpha.2
+
+- Consolidates selected-summary actions into `Explain`, `Simplify`, and `Quote to chat`; quoting preserves the current draft and never sends automatically.
+- Makes message actions state-aware: an active assistant reply exposes copy, regenerate, stop, and delete, while completed messages expose copy, regenerate, edit, and delete.
+- Serializes stop, regenerate, and active-message deletion through the current request lifecycle so stale provider callbacks cannot restore removed output or overwrite a replacement reply.
+- Keeps partial output visible after a user stop, marks it incomplete, and continues excluding service-returned reasoning from copied answers and later model context.
+- Redesigns the default Style2 with independently implemented warm-neutral and steel-blue tokens, restrained surfaces, keyboard-accessible controls, reduced-motion handling, and a narrow-screen overlay fallback; Style1 remains the compatibility theme.
+- Adds focused selection-action, message-state, abort-race, accessibility, responsive-layout, and release-route regression coverage.
+- Inserts this release as the one-time feature and default-UI gate in `7.8.0-alpha.1 -> 7.8.0-alpha.2 -> 7.8.0-beta.1 -> 7.8.0`; beta remains compatibility-only.
+
 ## 7.8.0-alpha.1
 
 - Migrates the maintainable implementation from one userscript file into 27 responsibility-oriented ES modules under `src/`, while continuing to publish one Tampermonkey-compatible file under `dist/`.
@@ -7,7 +17,7 @@
 - Moves legacy regression checks from bundle formatting assumptions to source behavior and module contracts.
 - Makes model-list requests cancellable, enforces a 15-second timeout, and restores both model-fetch buttons after success, failure, timeout, modal close, or UI teardown.
 - Escapes provider and topic-derived status text and normalizes export filenames before inserting them into UI or download paths.
-- Keeps the migration release route deliberately short: `7.8.0-alpha.1 -> 7.8.0-beta.1 -> 7.8.0`.
+- Establishes the modular migration baseline later followed by the one-time `alpha.2` interaction/UI gate, compatibility-only `beta.1`, and stable `7.8.0` promotion.
 
 ## 7.7-alpha.9
 

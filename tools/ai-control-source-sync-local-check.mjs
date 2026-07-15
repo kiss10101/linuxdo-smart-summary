@@ -132,8 +132,8 @@ assertContains(distText, 'this.dirtySettingsKeys = new Set();', 'explicit dirty 
 assertContains(distText, 'markSettingsDirty', 'settings dirty marker helper');
 assertContains(distText, 'clearSettingsDirty', 'settings dirty clear helper');
 assertContains(distText, 'this.dirtySettingsKeys.has(key)', 'dirty check uses explicit dirty keys');
-assertNotContains(distText, 'document.activeElement', 'dirty check must not rely on activeElement focus');
-assertNotContains(distText, 'shadow?.activeElement', 'dirty check must not rely on shadow activeElement');
+assertNotContains(syncBlock, 'document.activeElement', 'dirty check must not rely on activeElement focus');
+assertNotContains(syncBlock, 'shadow?.activeElement', 'dirty check must not rely on shadow activeElement');
 assertContains(distText, "this.showToast('其他标签页有设置更新，完成当前编辑后将处理同步')", 'dirty remote conflict toast');
 assertContains(distText, 'btn-summary-scroll-bottom', 'summary jump-to-latest control');
 assertContains(distText, 'forceScrollSummaryToBottom', 'summary forced jump helper');

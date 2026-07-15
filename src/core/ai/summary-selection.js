@@ -37,29 +37,37 @@ export const summarySelectionCore = {
             };
         }
 
-        if (action === 'summarize') {
+        if (action === 'simplify' || action === 'summarize') {
             return {
-                action,
+                action: 'simplify',
                 autoSend: true,
                 truncated: normalized.truncated,
-                prompt: `请只针对下面这段总结内容做进一步压缩总结。要求：\n1. 提炼核心观点；\n2. 保留关键实体、原因和结论；\n3. 如有不确定处，请说明不确定。\n\n选中文本：\n${quote}${truncatedNote}`
+                prompt: `请只针对下面这段总结内容进行精简。要求：\n1. 用更短、更清晰的表达保留核心含义；\n2. 保留关键实体、原因和结论；\n3. 不扩展到整篇主题，也不要补充原文没有的信息。\n\n选中文本：\n${quote}${truncatedNote}`
             };
         }
 
-        if (action === 'ask') {
-            return {
-                action,
-                autoSend: false,
-                truncated: normalized.truncated,
-                prompt: `我想基于下面这段内容继续提问：\n\n${quote}${truncatedNote}\n\n我的问题是：`
-            };
-        }
-
+        const quoteText = `${rawText ?? ''}`
+            .replace(/\r\n?/g, '\n')
+            .split('\n')
+            .map(line => line.replace(/[\t\f\v ]+/g, ' ').trim())
+            .filter(Boolean)
+            .join('\n');
+        const quoteTruncated = quoteText.length > normalized.maxChars;
+        const limitedQuote = quoteTruncated
+            ? quoteText.slice(0, normalized.maxChars).trim()
+            : quoteText;
+        const blockquote = limitedQuote
+            .split(/\r?\n/)
+            .map(line => `> ${line}`)
+            .join('\n');
+        const quoteTruncatedNote = quoteTruncated
+            ? `\n\n注：原选区较长，已截取前 ${normalized.maxChars} 字。`
+            : '';
         return {
-            action: 'insert',
+            action: 'quote',
             autoSend: false,
-            truncated: normalized.truncated,
-            prompt: `选中的总结片段：\n\n${quote}${truncatedNote}\n\n请基于这段内容回答：`
+            truncated: quoteTruncated,
+            prompt: `${blockquote}${quoteTruncatedNote}\n\n`
         };
     },
 };

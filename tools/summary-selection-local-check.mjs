@@ -18,7 +18,6 @@ function assertContains(text, fragment, label) {
 }
 
 const fixturePath = process.argv[2] || 'fixtures/summary-selection.fixture.json';
-const version = process.argv[3] || '7.7-alpha.9';
 const fixture = JSON.parse(await readFile(resolve(process.cwd(), fixturePath), 'utf8'));
 const maxChars = fixture.maxChars || 2000;
 
@@ -38,15 +37,30 @@ for (const testCase of fixture.promptCases || []) {
   console.log(`promptCase: ${testCase.name} -> ${promptSpec.action}/${promptSpec.autoSend ? 'auto' : 'draft'}`);
   if ('expectedAction' in testCase) assertEqual(promptSpec.action, testCase.expectedAction, `${testCase.name}: action`);
   if ('expectedAutoSend' in testCase) assertEqual(promptSpec.autoSend, testCase.expectedAutoSend, `${testCase.name}: autoSend`);
+  if ('expectedPrompt' in testCase) assertEqual(promptSpec.prompt, testCase.expectedPrompt, `${testCase.name}: exact prompt`);
   for (const fragment of testCase.expectedContains || []) {
     assertContains(promptSpec.prompt, fragment, `${testCase.name}: prompt`);
   }
 }
 
-const distPath = resolve(process.cwd(), `dist/Linux.do 智能总结-${version}.user.js`);
-const distArtifact = await readFile(distPath, 'utf8');
 const sourceText = await readProjectSource();
-assertContains(distArtifact, `// @version      ${version}`, 'userscript version');
+
+const selectionMenuMatch = sourceText.match(/getSummarySelectionMenuHtml\(\)\s*\{([\s\S]*?)\n\s*}\s*,/);
+if (!selectionMenuMatch) throw new Error('source shape: getSummarySelectionMenuHtml block not found');
+for (const fragment of ['role="toolbar"', '>解释<', '>精简<', '>引用到对话<']) {
+  assertContains(selectionMenuMatch[1], fragment, `selection toolbar contains ${fragment}`);
+}
+for (const legacyAction of ['data-summary-selection-action="ask"', 'data-summary-selection-action="summarize"', 'data-summary-selection-action="insert"']) {
+  if (selectionMenuMatch[1].includes(legacyAction)) throw new Error(`selection toolbar still exposes legacy action ${legacyAction}`);
+}
+const actionIndices = [
+  'data-summary-selection-action="explain">解释',
+  'data-summary-selection-action="simplify">精简',
+  'data-summary-selection-action="quote">引用到对话'
+].map(fragment => selectionMenuMatch[1].indexOf(fragment));
+if (actionIndices.some(index => index < 0) || actionIndices.some((index, position) => position > 0 && index <= actionIndices[position - 1])) {
+  throw new Error(`selection toolbar action order mismatch: ${JSON.stringify(actionIndices)}`);
+}
 
 for (const fragment of fixture.distShape?.requiredContains || []) {
   assertContains(sourceText, fragment, `source contains ${fragment}`);

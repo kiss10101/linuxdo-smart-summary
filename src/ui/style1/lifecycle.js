@@ -30,7 +30,9 @@ export const style1Lifecycle = {
         this.editingMessageId = null;
         this.editingDraftBefore = '';
         this.currentMessageMenuId = null;
+        this.currentMessageMenuReturnFocus = null;
         this.currentSummarySelection = null;
+        this.currentSummarySelectionReturnFocus = null;
         this.summarySelectionOpenTimerId = null;
         this.summarySelectionRequestSeq = 0;
         this.chatRequestSeq = 0;
@@ -41,6 +43,7 @@ export const style1Lifecycle = {
         this.modelListTimeoutMs = 15_000;
         this.currentAiAbortController = null;
         this.currentAiAbortScope = '';
+        this.activeChatRequest = null;
         this.settingsStorageSyncTimerId = null;
         this.settingsStorageSyncRetryTimerId = null;
         this.pendingSettingsStorageSyncKeys = new Set();
@@ -76,6 +79,7 @@ export const style1Lifecycle = {
     },
 
     destroy() {
+        if (this.activeChatRequest) this.abortActiveChatRequest?.('close');
         this.cancelModelListRequest();
         this._cleanupFns?.forEach((cleanup) => cleanup());
         this._cleanupFns = [];
@@ -95,6 +99,7 @@ export const style1Lifecycle = {
         this.summarySelectionOpenTimerId = null;
         this.summarySelectionRequestSeq = (this.summarySelectionRequestSeq || 0) + 1;
         this.currentSummarySelection = null;
+        this.currentSummarySelectionReturnFocus = null;
         this.resetGlobalUiState();
         this.isOpen = false;
     },
@@ -237,22 +242,22 @@ export const style1Lifecycle = {
 
     getMessageContextMenuHtml() {
         return `
-            <div class="message-context-menu" id="message-context-menu" role="menu" aria-hidden="true">
-                <button type="button" class="message-menu-item" data-message-menu-action="copy" role="menuitem">复制</button>
-                <button type="button" class="message-menu-item" data-message-menu-action="edit" role="menuitem">编辑</button>
+            <div class="message-context-menu" id="message-context-menu" role="menu" aria-label="消息操作" aria-hidden="true">
+                <button type="button" class="message-menu-item" data-message-menu-action="copy" role="menuitem">复制消息</button>
                 <button type="button" class="message-menu-item" data-message-menu-action="regenerate" role="menuitem">重新生成</button>
-                <button type="button" class="message-menu-item danger" data-message-menu-action="delete" role="menuitem">删除</button>
+                <button type="button" class="message-menu-item" data-message-menu-action="stop" role="menuitem">停止更新</button>
+                <button type="button" class="message-menu-item" data-message-menu-action="edit" role="menuitem">编辑消息</button>
+                <button type="button" class="message-menu-item danger" data-message-menu-action="delete" role="menuitem">删除消息</button>
             </div>
         `;
     },
 
     getSummarySelectionMenuHtml() {
         return `
-            <div class="summary-selection-menu" id="summary-selection-menu" role="menu" aria-hidden="true">
-                <button type="button" class="summary-selection-item" data-summary-selection-action="explain" role="menuitem">解释</button>
-                <button type="button" class="summary-selection-item" data-summary-selection-action="ask" role="menuitem">追问</button>
-                <button type="button" class="summary-selection-item" data-summary-selection-action="summarize" role="menuitem">总结</button>
-                <button type="button" class="summary-selection-item" data-summary-selection-action="insert" role="menuitem">带入</button>
+            <div class="summary-selection-menu" id="summary-selection-menu" role="toolbar" aria-label="总结选区操作" aria-hidden="true">
+                <button type="button" class="summary-selection-item" data-summary-selection-action="explain">解释</button>
+                <button type="button" class="summary-selection-item" data-summary-selection-action="simplify">精简</button>
+                <button type="button" class="summary-selection-item" data-summary-selection-action="quote">引用到对话</button>
             </div>
         `;
     },

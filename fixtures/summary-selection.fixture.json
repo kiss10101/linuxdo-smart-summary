@@ -64,33 +64,38 @@
       "expectedContains": ["请解释下面这段总结内容", "原帖讨论", "不要编造", "这段涉及楼层争议和主要结论"]
     },
     {
-      "name": "summarize sends immediately",
-      "action": "summarize",
-      "text": "这段内容需要进一步压缩总结",
+      "name": "simplify sends immediately",
+      "action": "simplify",
+      "text": "这段内容需要进一步精简",
+      "expectedAction": "simplify",
       "expectedAutoSend": true,
-      "expectedContains": ["进一步压缩总结", "提炼核心观点", "这段内容需要进一步压缩总结"]
+      "expectedContains": ["进行精简", "更短、更清晰", "这段内容需要进一步精简"]
     },
     {
-      "name": "ask fills draft",
-      "action": "ask",
-      "text": "我想继续问这个片段",
+      "name": "quote fills draft",
+      "action": "quote",
+      "text": "只引用不自动发送",
+      "expectedAction": "quote",
       "expectedAutoSend": false,
-      "expectedContains": ["我想基于下面这段内容继续提问", "我的问题是：", "我想继续问这个片段"]
+      "expectedContains": ["> 只引用不自动发送"],
+      "expectedPrompt": "> 只引用不自动发送\n\n"
     },
     {
-      "name": "insert fills draft",
-      "action": "insert",
-      "text": "只带入不自动发送",
+      "name": "quote preserves non-empty lines",
+      "action": "quote",
+      "text": "第一行\n\n  第二行  ",
+      "expectedAction": "quote",
       "expectedAutoSend": false,
-      "expectedContains": ["选中的总结片段", "请基于这段内容回答", "只带入不自动发送"]
+      "expectedContains": ["> 第一行", "> 第二行"],
+      "expectedPrompt": "> 第一行\n> 第二行\n\n"
     },
     {
-      "name": "unknown action falls back to insert",
+      "name": "unknown action falls back to quote",
       "action": "unknown",
-      "text": "未知动作应走带入",
-      "expectedAction": "insert",
+      "text": "未知动作应走引用",
+      "expectedAction": "quote",
       "expectedAutoSend": false,
-      "expectedContains": ["选中的总结片段", "未知动作应走带入"]
+      "expectedContains": ["> 未知动作应走引用"]
     }
   ],
   "distShape": {
@@ -104,9 +109,8 @@
       "summarySelectionRequestSeq",
       "clearCurrentSelection",
       "data-summary-selection-action=\"explain\"",
-      "data-summary-selection-action=\"ask\"",
-      "data-summary-selection-action=\"summarize\"",
-      "data-summary-selection-action=\"insert\"",
+      "data-summary-selection-action=\"simplify\"",
+      "data-summary-selection-action=\"quote\"",
       "summary-selection-menu",
       "meaningful.length > 0",
       "const hasDraft = !!input?.value.trim()",

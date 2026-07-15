@@ -23,6 +23,7 @@ export const style1State = {
         Q('#export-recent-count').textContent = recentFloors;
         Q('#cfg-stream').checked = GM_getValue('useStream', true);
         Q('#cfg-autoscroll').checked = GM_getValue('autoScroll', true);
+        this.switchTab(this.currentTab || 'summary');
     },
 
     applySideState() {
@@ -46,19 +47,26 @@ export const style1State = {
             btn.className = 'btn-snap-right' + (this.isOpen ? ' arrow-flip' : '');
             btn.innerHTML = arrowLeft;
         }
+        btn.setAttribute('aria-expanded', `${this.isOpen}`);
+        btn.setAttribute('aria-label', this.isOpen ? '关闭智能总结侧栏' : '打开智能总结侧栏');
         this.updateButtonPosition();
+    },
+
+    isNarrowViewport(maxWidth = 700) {
+        return typeof window !== 'undefined' && window.innerWidth <= maxWidth;
     },
 
     updateButtonPosition(useTransition = true) {
         const Q = this.uiManager.Q.bind(this.uiManager);
         const btn = Q('#toggle-btn');
         if (!useTransition) btn.style.transition = 'none'; else btn.style.transition = '';
+        const openOffset = this.isOpen && !this.isNarrowViewport() ? `${this.sidebarWidth}px` : '0';
         if (this.side === 'left') {
             btn.style.right = 'auto';
-            btn.style.left = this.isOpen ? `${this.sidebarWidth}px` : '0';
+            btn.style.left = openOffset;
         } else {
             btn.style.left = 'auto';
-            btn.style.right = this.isOpen ? `${this.sidebarWidth}px` : '0';
+            btn.style.right = openOffset;
         }
         if (!useTransition) {
             btn.offsetHeight;
@@ -71,6 +79,8 @@ export const style1State = {
         const Q = this.uiManager.Q.bind(this.uiManager);
         Q('#sidebar').classList.toggle('open', this.isOpen);
         Q('#toggle-btn').classList.toggle('arrow-flip', this.isOpen);
+        Q('#toggle-btn').setAttribute('aria-expanded', `${this.isOpen}`);
+        Q('#toggle-btn').setAttribute('aria-label', this.isOpen ? '关闭智能总结侧栏' : '打开智能总结侧栏');
         this.squeezeBody(this.isOpen);
         if (this.isOpen) this.initRangeInputs();
         this.updateButtonPosition();
@@ -79,7 +89,7 @@ export const style1State = {
     squeezeBody(active) {
         const body = document.body;
         body.style.transition = 'margin 0.35s cubic-bezier(0.4, 0, 0.2, 1)';
-        if (!active) {
+        if (!active || this.isNarrowViewport()) {
             body.style.marginLeft = ''; body.style.marginRight = '';
         } else {
             if (this.side === 'left') {
@@ -94,9 +104,19 @@ export const style1State = {
         const Q = this.uiManager.Q.bind(this.uiManager);
         this.closeMessageContextMenu?.();
         this.closeSummarySelectionMenu?.();
-        Q('.tab-bar').querySelectorAll('.tab-item').forEach(t => t.classList.toggle('active', t.dataset.tab === tabName));
+        Q('.tab-bar').querySelectorAll('.tab-item').forEach((tab) => {
+            const active = tab.dataset.tab === tabName;
+            tab.classList.toggle('active', active);
+            tab.setAttribute('aria-selected', `${active}`);
+            tab.tabIndex = active ? 0 : -1;
+        });
         const contentArea = Q('.content-area');
-        contentArea.querySelectorAll('.view-page').forEach(p => p.classList.toggle('active', p.id === `page-${tabName}`));
+        contentArea.querySelectorAll('.view-page').forEach((panel) => {
+            const active = panel.id === `page-${tabName}`;
+            panel.classList.toggle('active', active);
+            panel.hidden = !active;
+            panel.setAttribute('aria-hidden', `${!active}`);
+        });
         contentArea.classList.toggle('chat-active', tabName === 'chat');
         this.currentTab = tabName;
         if (tabName === 'chat') this.setManagedTimeout(() => this.updateScrollButtons(), 100);
@@ -172,6 +192,92 @@ export const style1State = {
         return controller;
     },
 
+    beginChatRequestLifecycle({ userMessageId, assistantMessageId, outputState, controller }) {
+        const requestController = controller || this.startAiAbortController('chat');
+        const request = {
+            token: (this.chatRequestSeq || 0) + 1,
+            controller: requestController,
+            userMessageId,
+            assistantMessageId,
+            outputState,
+            phase: 'preparing',
+            abortReason: '',
+            startedAt: Date.now()
+        };
+        this.chatRequestSeq = request.token;
+        this.activeChatRequest = request;
+        return request;
+    },
+
+    isCurrentChatRequest(request) {
+        return Boolean(request
+            && this.activeChatRequest === request
+            && request.token === this.chatRequestSeq
+            && !request.abortReason);
+    },
+
+    setChatRequestPhase(request, phase) {
+        if (!this.isCurrentChatRequest(request)) return false;
+        request.phase = phase;
+        return true;
+    },
+
+    abortActiveChatRequest(reason = 'stop') {
+        const request = this.activeChatRequest;
+        if (!request) return null;
+
+        request.abortReason = reason;
+        request.phase = reason === 'regenerate'
+            ? 'regenerating'
+            : reason === 'delete'
+                ? 'deleting'
+                : 'stopping';
+        this.chatRequestSeq = Math.max(this.chatRequestSeq || 0, request.token) + 1;
+        this.activeChatRequest = null;
+        this.cancelBubbleRender?.(request.assistantMessageId);
+
+        if (!request.controller.signal.aborted) {
+            request.controller.abort(reason);
+        }
+
+        const userMessage = this.findVisibleMessage?.(request.userMessageId);
+        if (userMessage) this.setVisibleMessage(request.userMessageId, { excludeFromApi: true });
+
+        if (reason === 'stop') {
+            const assistantMessage = this.findVisibleMessage?.(request.assistantMessageId);
+            if (assistantMessage) {
+                const outputState = Core.createAiOutputState(request.outputState || assistantMessage.outputState || {});
+                Core.markAiOutputFailure(outputState, { ok: false, kind: 'request_aborted' });
+                this.setVisibleMessage(request.assistantMessageId, {
+                    content: outputState.contentText,
+                    rawContent: outputState.contentText,
+                    outputState,
+                    status: 'stopped',
+                    errorKind: 'request_aborted',
+                    errorMessage: '生成已停止，以上内容可能不完整。',
+                    excludeFromApi: true,
+                    regenerateFromUserId: request.userMessageId
+                });
+                const bubble = this.getBubbleElement?.(request.assistantMessageId);
+                if (bubble) this.renderBubbleContent?.(bubble, this.findVisibleMessage(request.assistantMessageId));
+            }
+        }
+
+        this.clearAiAbortController(request.controller);
+        this.setLoading('#btn-send', false);
+        this.updateChatInputMode?.();
+        this.userScrolledUp = false;
+        this.updateScrollButtons?.();
+        return request;
+    },
+
+    finalizeChatRequest(request, phase = 'completed') {
+        if (!this.isCurrentChatRequest(request)) return false;
+        request.phase = phase;
+        this.activeChatRequest = null;
+        return true;
+    },
+
     clearAiAbortController(controller = null) {
         if (controller && this.currentAiAbortController !== controller) return;
         const scope = this.currentAiAbortScope;
@@ -181,6 +287,11 @@ export const style1State = {
     },
 
     stopCurrentAiGeneration() {
+        if (this.activeChatRequest) {
+            this.abortActiveChatRequest('stop');
+            this.showToast('已停止本次 AI 生成', 'success');
+            return true;
+        }
         const controller = this.currentAiAbortController;
         if (controller) {
             controller.abort();

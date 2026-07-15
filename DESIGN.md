@@ -6,7 +6,8 @@
 - Continue shipping one directly installable Tampermonkey userscript.
 - Make the published file reproducible from committed source and a locked toolchain.
 - Preserve the verified Linux.do request policy and existing runtime behavior.
-- Keep the architecture migration release route to three public gates.
+- Keep the architecture migration route bounded to one source gate, one feature/UI gate,
+  one compatibility gate, and stable promotion.
 
 ## Source And Artifact Boundary
 
@@ -55,6 +56,38 @@ Success, provider failure, timeout, modal close, and UI destruction all clear th
 abort or release the controller, and restore both buttons. Closing the modal therefore
 does not leave a hidden request or a temporary lockout. Provider model order is preserved.
 
+## Interaction State Contracts
+
+Selected-summary actions and chat-message actions are shared behavior contracts rather than
+theme-specific policy. The summary toolbar exposes explain, simplify, and quote-to-chat.
+Explain and simplify may send only when no AI request or user draft would be displaced;
+quote-to-chat always appends a block quote to the draft and never sends automatically.
+
+Message actions are derived from message role, message status, active request identity, and
+copyable answer content. During generation, only the active assistant reply can stop,
+regenerate, or delete the request; historical messages remain copy-only. Completed messages
+expose copy, regenerate, edit, and delete. Copy excludes reasoning and UI metadata.
+
+Every AI request has one sequence token, controller, user-message identity, assistant-message
+identity, and abort reason. Stop, regenerate, delete, close, and replacement paths pass through
+the same lifecycle boundary. Async callbacks must prove that their token is still current
+before updating state or presentation, so an aborted request cannot restore deleted output or
+overwrite its replacement. User stops preserve partial output as incomplete; reasoning remains
+outside later provider context.
+
+## Presentation Boundary
+
+Style2 is the default presentation and uses independent warm-neutral and steel-blue theme
+tokens, system fonts, bounded shadows and radii, explicit transitions, reduced-motion support,
+and a narrow-screen overlay fallback. It retains the attached desktop panel and existing tab
+and settings information architecture. Style1 keeps its established visual treatment as the
+compatibility theme while consuming the same selection, message-action, request-lifecycle,
+keyboard, and menu-positioning behavior.
+
+Interactive tabs, menu triggers, menu items, and toolbar actions use native button semantics
+with explicit ARIA state and keyboard navigation. At narrow viewport widths the panel stops
+changing page margins, covers at most the viewport, and disables its desktop resize affordance.
+
 ## Verification Layers
 
 | Layer | Responsibility |
@@ -98,24 +131,29 @@ accepted in the repository.
 
 ## Transitional Limits
 
-The first modular release intentionally preserves behavior and keeps seven presentation or
-orchestration modules above 500 lines. They are isolated behind composition roots and remain
-below the enforced 120 KB module ceiling. Splitting them further is a beta maintenance option,
-not another release stage and not a reason to delay the source/build migration alpha.
+The first modular release intentionally preserved behavior and accepted several larger
+presentation or orchestration modules behind composition roots. Alpha.2 may split Style2
+presentation concerns where that directly supports the approved UI work, but it does not
+introduce a theme framework or reserve extension points for hypothetical future styles.
+Further unrelated decomposition remains maintenance work, not another release stage.
 
 ## Short Release Route
 
 ```text
-7.8.0-alpha.1 -> 7.8.0-beta.1 -> 7.8.0
+7.8.0-alpha.1 -> 7.8.0-alpha.2 -> 7.8.0-beta.1 -> 7.8.0
 ```
 
 - `alpha.1`: validates source/build equivalence, module boundaries, and maintainer workflow.
-- `beta.1`: reserved for real-user compatibility fixes found in alpha; no planned features.
+- `alpha.2`: one-time selected-text, message-lifecycle, accessibility, responsive, and default
+  UI feature gate.
+- `beta.1`: reserved for real-user compatibility fixes found in alpha; no new features.
 - `7.8.0`: stable promotion after beta acceptance; no architecture expansion.
 
-There are no planned `alpha.2`, `alpha.3`, or release-candidate stages. A critical defect can
-still justify an exceptional patch, but the default route remains exactly these three gates.
-The route is stored in `tools/release-manifest.json` and enforced by release verification.
+There are no planned `alpha.3` or release-candidate stages. Alpha.2 is the single exception
+added after alpha.1 to carry the approved user-facing interaction and default-UI work. A
+critical defect can still justify an exceptional patch, but the planned route remains exactly
+these four gates. The route is stored in `tools/release-manifest.json` and enforced by release
+verification.
 
 ## GitHub Automation
 
@@ -143,6 +181,24 @@ Recommended repository settings are:
 
 ## Change History
 
+### 2026-07-16 - Interaction and default UI gate
+
+**Change**: Added a one-time alpha.2 gate for selected-summary action consolidation,
+state-aware message controls, guarded request cancellation, a redesigned default Style2,
+keyboard interaction, reduced-motion behavior, and narrow-screen fallback.
+
+**Reason**: The modular alpha made runtime maintenance auditable, but the approved user-facing
+interaction and presentation changes require real-provider and real-browser validation before
+the compatibility-only beta.
+
+**Impact**: Shared UI behavior, active AI request lifecycle, default Style2 presentation,
+accessibility and responsive behavior, tests, release metadata, and generated preview asset.
+Stored settings, provider profiles, Linux.do request policy, public runtime APIs, and Style1's
+visual identity remain compatible.
+
+**Decision**: Treat alpha.2 as the final planned feature/UI gate. Keep beta.1 limited to
+compatibility and defect closure, then promote the verified result to 7.8.0.
+
 ### 2026-07-15 - Modular source migration
 
 **Change**: Replaced direct maintenance of the userscript bundle with 27 ES modules, a locked
@@ -154,5 +210,6 @@ difficult even though the installed artifact still needed to remain a single fil
 **Impact**: Maintainer workflow, release automation, model-list request lifecycle, tests,
 documentation, and the generated preview artifact. Linux.do request policy is unchanged.
 
-**Decision**: Preserve runtime method contracts through explicit composition roots, keep the
-toolchain to Node plus exact esbuild, and use the three-stage `alpha.1 -> beta.1 -> stable` route.
+**Decision**: Preserve runtime method contracts through explicit composition roots and keep
+the toolchain to Node plus exact esbuild. The original three-stage route was later amended by
+the recorded alpha.2 interaction/UI decision above.

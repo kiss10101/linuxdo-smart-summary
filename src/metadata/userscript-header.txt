@@ -23,7 +23,7 @@
 /*
  * 更新摘要
  * Upstream: GreasyFork script 558028, publisher Passerby1011; original metadata author 半杯无糖、WolfHolo、LD Export; MIT license.
- * __VERSION__: 将脚本迁移为多文件源码与确定性单文件构建；按 AI、Discourse、内容、导出和 UI 职责拆分模块，并建立源码测试、生成物校验与 CI 发布门禁。
+ * __VERSION__: 精简总结选区操作，为生成中与已完成消息提供状态化操作菜单和安全的停止、重新生成、删除流程；重设计默认 Style2 并补齐键盘操作、减少动画和窄屏回退。
  * 7.7-alpha.9: 将服务商返回的推理内容与最终回答改为独立状态；流式/非流式不再拼接伪 <think> 标签，保留截断、中止和失败前的部分输出，并以可访问的折叠面板安全展示推理内容。
  * 7.7-alpha.8: 加固 HTML 转纯文本和公开 fixture URL 隐私门禁；在总结/追问的 AI 上下文中保留主贴与回复的 created_at ISO 时间戳，不改变 Linux.do 请求策略。
  * 7.7-alpha.7: 公开仓库隐私与供应链加固；测试数据改为合成内容，固定 marked/DOMPurify 版本与完整性哈希，不改变 Linux.do 请求策略。

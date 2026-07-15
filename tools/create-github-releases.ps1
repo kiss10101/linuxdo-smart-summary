@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "7.8.0-alpha.1",
+    [string]$Version = "7.8.0-alpha.2",
     [switch]$All,
     [switch]$SkipVerify
 )
@@ -8,6 +8,22 @@ $ErrorActionPreference = "Stop"
 
 $repo = "kiss10101/linuxdo-smart-summary"
 $releases = @(
+    @{
+        Tag          = "v7.8.0-alpha.2"
+        Name         = "v7.8.0-alpha.2"
+        AssetPattern = "*7.8.0-alpha.2.user.js"
+        AssetName    = "linuxdo-smart-summary-7.8.0-alpha.2.user.js"
+        Prerelease   = $true
+        Body         = @"
+7.8.0-alpha.2 interaction and default UI preview.
+
+- Consolidates selected-summary actions into explain, simplify, and quote-to-chat workflows.
+- Makes message actions state-aware during and after generation, including safe stop, regenerate, and delete behavior that rejects stale request updates.
+- Redesigns the default Style2 with a restrained warm-neutral and steel-blue system while preserving Style1 as the compatibility theme.
+- Adds keyboard-accessible menus, reduced-motion handling, and a narrow-screen overlay fallback without changing stored settings.
+- Acts as the one-time feature and UI gate before compatibility-only 7.8.0-beta.1 validation.
+"@
+    },
     @{
         Tag          = "v7.8.0-alpha.1"
         Name         = "v7.8.0-alpha.1"
@@ -20,7 +36,7 @@ $releases = @(
 - Moves maintainable runtime code into 27 responsibility-oriented ES modules while preserving one-file Tampermonkey installation.
 - Adds a locked esbuild pipeline, direct source tests, generated-artifact verification, and read-only pull-request CI.
 - Makes model-list requests cancellable and time-bounded, with controls restored after every terminal path.
-- Uses the short migration route 7.8.0-alpha.1 -> 7.8.0-beta.1 -> 7.8.0.
+- Starts the modular migration route that continues through the one-time alpha.2 feature/UI gate, compatibility-only beta.1, and stable 7.8.0.
 "@
     },
     @{

@@ -6,10 +6,7 @@ import { Core } from '../src/core/index.js';
 import { readProjectSource } from './source-test-helper.mjs';
 
 const fixturePath = process.argv[2] || 'fixtures/chat-message-actions.fixture.json';
-const version = process.argv[3] || '7.7-alpha.9';
 const fixture = JSON.parse(await readFile(resolve(process.cwd(), fixturePath), 'utf8'));
-const distPath = resolve(process.cwd(), `dist/Linux.do 智能总结-${version}.user.js`);
-const distText = await readFile(distPath, 'utf8');
 const sourceText = await readProjectSource();
 
 function createVisibleMessage(message) {

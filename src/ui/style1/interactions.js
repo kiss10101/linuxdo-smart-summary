@@ -227,20 +227,26 @@ export const style1Interactions = {
         this.renderChatMessages();
         const msgDiv = this.getBubbleElement(targetAssistant.id);
 
-        const requestSeq = ++this.chatRequestSeq;
         const outputState = Core.createAiOutputState();
+        const abortController = this.startAiAbortController('chat');
+        const request = this.beginChatRequestLifecycle({
+            userMessageId: userMessage.id,
+            assistantMessageId: targetAssistant.id,
+            outputState,
+            controller: abortController
+        });
         this.setLoading('#btn-send', true);
 
         const messages = this.buildChatApiMessages({
             throughMessageId: userMessage.id,
             includeExcludedMessageId: userMessage.id
         });
-        const abortController = this.startAiAbortController('chat');
+        this.setChatRequestPhase(request, 'streaming');
 
         try {
             await Core.streamChat(messages,
                 (event) => {
-                    if (requestSeq !== this.chatRequestSeq) return;
+                    if (!this.isCurrentChatRequest(request)) return;
                     Core.applyAiOutputEvent(outputState, event);
                     this.setVisibleMessage(targetAssistant.id, {
                         rawContent: outputState.contentText,
@@ -251,11 +257,12 @@ export const style1Interactions = {
                     if (bubble) this.scheduleBubbleRender(targetAssistant.id, bubble, () => outputState);
                 },
                 (meta = {}) => {
-                    if (requestSeq !== this.chatRequestSeq) return;
+                    if (!this.isCurrentChatRequest(request)) return;
                     this.cancelBubbleRender(targetAssistant.id);
                     Core.finishAiOutputState(outputState, meta);
                     const classified = Core.classifyAiOutput(outputState, meta);
                     if (classified.kind === 'success') {
+                        this.setChatRequestPhase(request, 'completed');
                         const sourceConfig = Core.normalizeAiSourceConfig(meta.sourceConfig);
                         this.setVisibleMessage(userMessage.id, { excludeFromApi: false });
                         this.setVisibleMessage(targetAssistant.id, {
@@ -273,6 +280,7 @@ export const style1Interactions = {
                         const bubble = this.getBubbleElement(targetAssistant.id);
                         if (bubble) this.updateBubble(bubble, outputState, false);
                     } else {
+                        this.setChatRequestPhase(request, 'failed');
                         const failure = Core.createModelOutputFailure(classified, {
                             operation: 'chat',
                             sourceConfig: meta.sourceConfig
@@ -297,17 +305,18 @@ export const style1Interactions = {
                     }
                 },
                 (err) => {
-                    if (requestSeq !== this.chatRequestSeq) return;
+                    if (!this.isCurrentChatRequest(request)) return;
                     this.cancelBubbleRender(targetAssistant.id);
                     const failure = Core.normalizeAiFailure(err, { operation: 'chat' });
                     const formatted = Core.formatAiFailureForUi(failure);
+                    this.setChatRequestPhase(request, Core.isAiAbortFailure(failure) ? 'stopped' : 'failed');
                     Core.markAiOutputFailure(outputState, failure);
                     this.setVisibleMessage(userMessage.id, { excludeFromApi: true });
                     this.setVisibleMessage(targetAssistant.id, {
                         content: outputState.contentText,
                         rawContent: outputState.contentText,
                         outputState,
-                        status: 'error',
+                        status: Core.isAiAbortFailure(failure) ? 'stopped' : 'error',
                         errorKind: failure.kind || 'request_failed',
                         errorMessage: formatted.detail || formatted.title,
                         errorMeta: failure,
@@ -324,8 +333,10 @@ export const style1Interactions = {
                 { operation: 'chat', signal: abortController.signal }
             );
         } finally {
-            if (requestSeq === this.chatRequestSeq) {
+            if (this.isCurrentChatRequest(request)) {
                 this.clearAiAbortController(abortController);
+            }
+            if (this.finalizeChatRequest(request, request.phase)) {
                 this.setLoading('#btn-send', false);
                 this.updateChatInputMode();
                 this.userScrolledUp = false;
@@ -339,7 +350,10 @@ export const style1Interactions = {
     getMessageCopyText(message) {
         if (!message) return '';
         if (message.role === 'assistant') {
-            return message.outputState?.contentText || message.content || '';
+            const outputState = message.outputState
+                ? Core.createAiOutputState(message.outputState)
+                : Core.normalizeAiOutputState(message.rawContent || message.content || '');
+            return outputState.contentText || '';
         }
         return message.content || '';
     },
@@ -348,12 +362,17 @@ export const style1Interactions = {
         const formatted = message.errorMeta
             ? Core.formatAiFailureForUi(message.errorMeta, { operation: 'chat' })
             : null;
-        const title = formatted?.title || (message.errorKind === 'thinking_only'
+        const isStopped = message.status === 'stopped';
+        const title = isStopped
+            ? '已停止更新'
+            : formatted?.title || (message.errorKind === 'thinking_only'
             ? 'AI 只返回了推理内容'
             : message.errorKind === 'empty_response'
                 ? 'AI 返回了空内容'
                 : 'AI 回复失败');
-        const detailText = formatted?.detail || message.errorMessage || '';
+        const detailText = isStopped
+            ? (message.errorMessage || '生成已停止，以上内容可能不完整。')
+            : (formatted?.detail || message.errorMessage || '');
         const hintText = formatted?.hint || '';
         const detail = detailText ? `<div class="bubble-error-detail">${Core.escapeHtml(detailText)}</div>` : '';
         const hint = hintText ? `<div class="bubble-error-detail">${Core.escapeHtml(hintText)}</div>` : '';
@@ -370,11 +389,39 @@ export const style1Interactions = {
         `;
     },
 
+    ensureMessageMenuTrigger(div, message) {
+        if (!div || !message) return null;
+        div.tabIndex = 0;
+        div.setAttribute('aria-label', message.role === 'assistant' ? 'AI 消息' : '用户消息');
+
+        const existing = div.querySelector?.('[data-message-menu-trigger]');
+        if (existing) {
+            existing.dataset.messageId = message.id;
+            existing.setAttribute('aria-expanded', this.currentMessageMenuId === message.id ? 'true' : 'false');
+            return existing;
+        }
+
+        const trigger = document.createElement('button');
+        trigger.type = 'button';
+        trigger.className = 'message-menu-trigger';
+        trigger.dataset.messageMenuTrigger = '';
+        trigger.dataset.messageId = message.id;
+        trigger.setAttribute('aria-label', '消息操作');
+        trigger.setAttribute('aria-haspopup', 'menu');
+        trigger.setAttribute('aria-controls', 'message-context-menu');
+        trigger.setAttribute('aria-expanded', this.currentMessageMenuId === message.id ? 'true' : 'false');
+        trigger.title = '消息操作';
+        trigger.textContent = '⋯';
+        div.appendChild(trigger);
+        return trigger;
+    },
+
     renderBubbleContent(div, message) {
         const roleClass = message.role === 'assistant' ? 'ai' : 'user';
         div.className = `bubble bubble-${roleClass}`;
         div.classList.toggle('bubble-streaming', message.status === 'streaming');
         div.classList.toggle('bubble-error', message.status === 'error');
+        div.classList.toggle('bubble-stopped', message.status === 'stopped');
         div.classList.toggle('is-editing', message.id === this.editingMessageId);
         div.dataset.messageId = message.id;
         div.dataset.role = message.role;
@@ -384,20 +431,23 @@ export const style1Interactions = {
 
         if (message.role === 'user') {
             div.textContent = message.content ?? '';
+            this.ensureMessageMenuTrigger(div, message);
             return;
         }
 
-        if (message.status === 'error') {
+        if (message.status === 'error' || message.status === 'stopped') {
             const viewState = this.getReasoningPanelViewState(div, outputState, message.id);
             const preservedOutput = hasOutput
                 ? this.renderWithThinking(outputState, false, viewState)
                 : '';
             div.innerHTML = preservedOutput + this.renderChatErrorContent(message);
+            this.ensureMessageMenuTrigger(div, message);
             return;
         }
 
         if (message.status === 'streaming' && !hasOutput) {
             div.innerHTML = `<div class="thinking"><div class="thinking-dot"></div><div class="thinking-dot"></div><div class="thinking-dot"></div></div>`;
+            this.ensureMessageMenuTrigger(div, message);
             return;
         }
 
@@ -406,6 +456,89 @@ export const style1Interactions = {
             : Core.renderAiSourceMeta(message.sourceConfig);
         const viewState = this.getReasoningPanelViewState(div, outputState, message.id);
         div.innerHTML = this.renderWithThinking(outputState, message.status === 'streaming', viewState) + source;
+        this.ensureMessageMenuTrigger(div, message);
+    },
+
+    getMessageMenuActions(message) {
+        if (!message) return [];
+        const copyText = this.getMessageCopyText(message).trim();
+        const regenerateUser = this.getRegenerateUserMessage(message);
+        const activeRequest = this.activeChatRequest || null;
+        const generationActive = Boolean(this.isGenerating || activeRequest);
+        const isCurrentStreamingAssistant = Boolean(activeRequest
+            && message.role === 'assistant'
+            && message.status === 'streaming'
+            && activeRequest.assistantMessageId === message.id);
+        const action = (id, label, options = {}) => ({
+            id,
+            label,
+            visible: true,
+            disabled: options.disabled === true,
+            disabledReason: options.disabledReason || '',
+            danger: options.danger === true
+        });
+        const copyAction = action('copy', '复制消息', {
+            disabled: !copyText,
+            disabledReason: copyText ? '' : '尚无可复制正文'
+        });
+
+        if (generationActive) {
+            if (!isCurrentStreamingAssistant) return [copyAction];
+            return [
+                copyAction,
+                action('regenerate', '重新生成', {
+                    disabled: !regenerateUser,
+                    disabledReason: regenerateUser ? '' : '未找到可重新生成的问题'
+                }),
+                action('stop', '停止更新'),
+                action('delete', '删除消息', { danger: true })
+            ];
+        }
+
+        if (message.status === 'done') {
+            return [
+                copyAction,
+                action('regenerate', '重新生成', {
+                    disabled: !regenerateUser,
+                    disabledReason: regenerateUser ? '' : '未找到可重新生成的问题'
+                }),
+                action('edit', '编辑消息'),
+                action('delete', '删除消息', { danger: true })
+            ];
+        }
+
+        return [
+            copyAction,
+            action('regenerate', '重新生成', {
+                disabled: !regenerateUser,
+                disabledReason: regenerateUser ? '' : '未找到可重新生成的问题'
+            }),
+            action('delete', '删除消息', { danger: true })
+        ];
+    },
+
+    getMessageMenuAction(message, actionId) {
+        return this.getMessageMenuActions(message)
+            .find(action => action.id === actionId && action.visible !== false) || null;
+    },
+
+    renderMessageContextMenuActions(menu, message) {
+        menu.innerHTML = '';
+        this.getMessageMenuActions(message).forEach((action) => {
+            if (action.visible === false) return;
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = `message-menu-item${action.danger ? ' danger' : ''}`;
+            button.dataset.messageMenuAction = action.id;
+            button.setAttribute('role', 'menuitem');
+            button.textContent = action.label;
+            button.disabled = action.disabled;
+            if (action.disabledReason) {
+                button.title = action.disabledReason;
+                button.setAttribute('aria-label', `${action.label}：${action.disabledReason}`);
+            }
+            menu.appendChild(button);
+        });
     },
 
     bindMessageContextMenu() {
@@ -423,12 +556,61 @@ export const style1Interactions = {
             this.openMessageContextMenu(e, bubble.dataset.messageId);
         });
 
+        this.addManagedListener(list, 'click', (e) => {
+            const trigger = this.getClosestElement(e.target, '[data-message-menu-trigger]');
+            if (!trigger) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const rect = trigger.getBoundingClientRect();
+            this.openMessageContextMenu({
+                clientX: rect.right,
+                clientY: rect.bottom,
+                keyboard: false
+            }, trigger.dataset.messageId, { returnFocus: trigger, focusMenu: true });
+        });
+
+        this.addManagedListener(list, 'keydown', (e) => {
+            const trigger = this.getClosestElement(e.target, '[data-message-menu-trigger]');
+            const bubble = this.getClosestElement(e.target, '.bubble[data-message-id]');
+            const isContextKey = e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10');
+            if (!isContextKey || !bubble) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const returnFocus = trigger || bubble.querySelector('[data-message-menu-trigger]') || bubble;
+            const rect = returnFocus.getBoundingClientRect();
+            this.openMessageContextMenu({
+                clientX: rect.right,
+                clientY: rect.bottom,
+                keyboard: true
+            }, bubble.dataset.messageId, { returnFocus, focusMenu: true });
+        });
+
         this.addManagedListener(menu, 'contextmenu', (e) => e.preventDefault());
+        this.addManagedListener(menu, 'keydown', (e) => {
+            const items = Array.from(menu.querySelectorAll('[data-message-menu-action]:not(:disabled)'));
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                this.closeMessageContextMenu({ restoreFocus: true });
+                return;
+            }
+            if (!items.length || !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
+            e.preventDefault();
+            const activeElement = this.uiManager.shadow
+                ? this.uiManager.shadow.activeElement
+                : menu.ownerDocument?.activeElement;
+            const currentIndex = items.indexOf(activeElement);
+            let nextIndex = currentIndex;
+            if (e.key === 'Home') nextIndex = 0;
+            if (e.key === 'End') nextIndex = items.length - 1;
+            if (e.key === 'ArrowDown') nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % items.length;
+            if (e.key === 'ArrowUp') nextIndex = currentIndex < 0 ? items.length - 1 : (currentIndex - 1 + items.length) % items.length;
+            items[nextIndex]?.focus();
+        });
         this.addManagedListener(document, 'pointerdown', (e) => {
             if (!this.currentMessageMenuId) return;
             const path = e.composedPath?.() || [];
             if (path.includes(menu)) return;
-            this.closeMessageContextMenu();
+            this.closeMessageContextMenu({ restoreFocus: false });
         }, true);
         const closeMessageMenuOnFrame = this.createFrameThrottledHandler(() => this.closeMessageContextMenu());
         this.addManagedListener(window, 'resize', closeMessageMenuOnFrame);
@@ -441,7 +623,7 @@ export const style1Interactions = {
         const menu = Q('#summary-selection-menu');
         if (!resultBox || !menu) return;
 
-        const scheduleOpen = () => {
+        const scheduleOpen = (event) => {
             this.clearManagedTimeout(this.summarySelectionOpenTimerId);
             const requestSeq = (this.summarySelectionRequestSeq || 0) + 1;
             this.summarySelectionRequestSeq = requestSeq;
@@ -450,7 +632,10 @@ export const style1Interactions = {
                 if (requestSeq !== this.summarySelectionRequestSeq) return;
                 const selectionState = this.getSummarySelectionState();
                 if (selectionState) {
-                    this.openSummarySelectionMenu(selectionState);
+                    this.openSummarySelectionMenu({
+                        ...selectionState,
+                        focusMenu: event?.type === 'keyup'
+                    });
                 } else {
                     this.closeSummarySelectionMenu();
                 }
@@ -464,6 +649,30 @@ export const style1Interactions = {
         this.addManagedListener(resultBox, 'scroll', closeSummarySelectionOnFrame, { passive: true });
         this.addManagedListener(menu, 'mousedown', (e) => e.preventDefault());
         this.addManagedListener(menu, 'pointerdown', (e) => e.preventDefault());
+        this.addManagedListener(menu, 'keydown', (e) => {
+            const items = Array.from(menu.querySelectorAll('.summary-selection-item:not(:disabled)'));
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                this.closeSummarySelectionMenu({ restoreFocus: true });
+                return;
+            }
+            if (!items.length || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) return;
+            e.preventDefault();
+            const activeElement = this.uiManager.shadow
+                ? this.uiManager.shadow.activeElement
+                : menu.ownerDocument?.activeElement;
+            const currentIndex = items.indexOf(activeElement);
+            let nextIndex = currentIndex;
+            if (e.key === 'Home') nextIndex = 0;
+            if (e.key === 'End') nextIndex = items.length - 1;
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % items.length;
+            }
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                nextIndex = currentIndex < 0 ? items.length - 1 : (currentIndex - 1 + items.length) % items.length;
+            }
+            items[nextIndex]?.focus();
+        });
         this.addManagedListener(document, 'pointerdown', (e) => {
             if (!this.currentSummarySelection) return;
             const path = e.composedPath?.() || [];
@@ -506,9 +715,10 @@ export const style1Interactions = {
         const rect = this.getSelectionAnchorRect(range);
         if (!rect) return null;
 
-        const normalized = Core.normalizeSummarySelectionText(selection.toString());
+        const rawText = selection.toString();
+        const normalized = Core.normalizeSummarySelectionText(rawText);
         return {
-            text: normalized.text,
+            text: rawText.trim(),
             truncated: normalized.truncated,
             rect: {
                 left: rect.left,
@@ -561,9 +771,14 @@ export const style1Interactions = {
         if (!menu || !selectionState?.text) return;
         this.closeMessageContextMenu?.();
         this.currentSummarySelection = selectionState;
+        this.currentSummarySelectionReturnFocus = this.uiManager.shadow?.activeElement
+            || this.uiManager.Q('#summary-result');
         menu.classList.add('show');
         menu.setAttribute('aria-hidden', 'false');
         this.positionSummarySelectionMenu(menu, selectionState.rect);
+        if (selectionState.focusMenu) {
+            this.requestManagedFrame(() => menu.querySelector('.summary-selection-item')?.focus());
+        }
     },
 
     positionSummarySelectionMenu(menu, anchorRect) {
@@ -596,7 +811,7 @@ export const style1Interactions = {
         menu.style.visibility = '';
     },
 
-    closeSummarySelectionMenu() {
+    closeSummarySelectionMenu({ restoreFocus = false } = {}) {
         this.summarySelectionRequestSeq = (this.summarySelectionRequestSeq || 0) + 1;
         this.clearManagedTimeout(this.summarySelectionOpenTimerId);
         this.summarySelectionOpenTimerId = null;
@@ -605,30 +820,34 @@ export const style1Interactions = {
             menu.classList.remove('show');
             menu.setAttribute('aria-hidden', 'true');
         }
+        const returnFocus = this.currentSummarySelectionReturnFocus;
         this.currentSummarySelection = null;
+        this.currentSummarySelectionReturnFocus = null;
+        if (restoreFocus && returnFocus?.isConnected) returnFocus.focus();
     },
 
-    openMessageContextMenu(event, messageId) {
+    openMessageContextMenu(event, messageId, options = {}) {
         const Q = this.uiManager.Q.bind(this.uiManager);
         const menu = Q('#message-context-menu');
         const message = this.findVisibleMessage(messageId);
         if (!menu || !message) return;
 
+        this.closeSummarySelectionMenu?.();
         this.currentMessageMenuId = messageId;
-        const canMutate = !this.isGenerating && message.status !== 'streaming';
-        menu.querySelectorAll('[data-message-menu-action]').forEach((button) => {
-            const action = button.dataset.messageMenuAction;
-            let disabled = false;
-            if (action === 'copy') disabled = !this.getMessageCopyText(message).trim();
-            if (action === 'edit') disabled = !canMutate || (message.role === 'assistant' && message.status !== 'done');
-            if (action === 'regenerate') disabled = !canMutate || !this.getRegenerateUserMessage(message);
-            if (action === 'delete') disabled = !canMutate;
-            button.disabled = disabled;
+        this.currentMessageMenuReturnFocus = options.returnFocus || null;
+        Q('#chat-list')?.querySelectorAll('[data-message-menu-trigger]').forEach((trigger) => {
+            trigger.setAttribute('aria-expanded', trigger.dataset.messageId === messageId ? 'true' : 'false');
         });
+        this.renderMessageContextMenuActions(menu, message);
 
         menu.classList.add('show');
         menu.setAttribute('aria-hidden', 'false');
         this.positionMessageContextMenu(menu, event);
+        if (options.focusMenu) {
+            this.requestManagedFrame(() => {
+                menu.querySelector('[data-message-menu-action]:not(:disabled)')?.focus();
+            });
+        }
     },
 
     positionMessageContextMenu(menu, event) {
@@ -649,8 +868,11 @@ export const style1Interactions = {
         const maxX = Math.max(minX, sidebarRect.width - menuW - gap);
         const minY = gap;
         const maxY = Math.max(minY, sidebarRect.height - menuH - gap);
-        const localX = event.clientX - sidebarRect.left;
-        const localY = event.clientY - sidebarRect.top;
+        const anchor = this.getBubbleElement(this.currentMessageMenuId)?.getBoundingClientRect();
+        const clientX = Number.isFinite(event?.clientX) ? event.clientX : anchor?.right;
+        const clientY = Number.isFinite(event?.clientY) ? event.clientY : anchor?.top;
+        const localX = (Number.isFinite(clientX) ? clientX : sidebarRect.left + gap) - sidebarRect.left;
+        const localY = (Number.isFinite(clientY) ? clientY : sidebarRect.top + gap) - sidebarRect.top;
         const x = Math.max(minX, Math.min(localX, maxX));
         const y = Math.max(minY, Math.min(localY, maxY));
 
@@ -659,20 +881,33 @@ export const style1Interactions = {
         menu.style.visibility = '';
     },
 
-    closeMessageContextMenu() {
+    closeMessageContextMenu({ restoreFocus = false } = {}) {
         const menu = this.uiManager.Q('#message-context-menu');
         if (menu) {
             menu.classList.remove('show');
             menu.setAttribute('aria-hidden', 'true');
         }
+        this.uiManager.Q('#chat-list')?.querySelectorAll('[data-message-menu-trigger]').forEach((trigger) => {
+            trigger.setAttribute('aria-expanded', 'false');
+        });
+        const returnFocus = this.currentMessageMenuReturnFocus;
         this.currentMessageMenuId = null;
+        this.currentMessageMenuReturnFocus = null;
+        if (restoreFocus && returnFocus?.isConnected) returnFocus.focus();
     },
 
     handleMessageMenuAction(action, messageId) {
         if (!action || !messageId) return;
+        const message = this.findVisibleMessage(messageId);
+        const actionState = this.getMessageMenuAction(message, action);
+        if (!actionState || actionState.disabled) {
+            const reason = actionState?.disabledReason || '当前状态不能执行此操作';
+            return this.showToast(reason, 'error');
+        }
         if (action === 'copy') return this.copyMessage(messageId);
         if (action === 'edit') return this.startEditMessage(messageId);
         if (action === 'regenerate') return this.regenerateMessage(messageId);
+        if (action === 'stop') return this.stopMessageUpdate(messageId);
         if (action === 'delete') return this.deleteMessage(messageId);
     },
 
@@ -769,6 +1004,7 @@ export const style1Interactions = {
         this.setVisibleMessage(messageId, {
             content: nextContent,
             rawContent: nextContent,
+            outputState: isUser ? null : Core.normalizeAiOutputState(nextContent),
             status: 'done',
             errorKind: null,
             errorMessage: '',
@@ -814,12 +1050,20 @@ export const style1Interactions = {
     },
 
     async regenerateMessage(messageId) {
-        if (this.isGenerating) return this.showToast('生成中不能重新生成', 'error');
         const message = this.findVisibleMessage(messageId);
         const userMessage = this.getRegenerateUserMessage(message);
         if (!message || !userMessage) return this.showToast('未找到可重新生成的问题', 'error');
 
+        const activeRequest = this.activeChatRequest;
+        const isCurrentStreamingAssistant = Boolean(activeRequest
+            && message.role === 'assistant'
+            && message.id === activeRequest.assistantMessageId);
+        if (this.isGenerating && !isCurrentStreamingAssistant) {
+            return this.showToast('当前回复生成中，只能重新生成正在更新的消息', 'error');
+        }
+
         this.closeMessageContextMenu();
+        if (isCurrentStreamingAssistant) this.abortActiveChatRequest('regenerate');
         if (message.role === 'assistant') {
             this.removeVisibleMessagesAfter(message.id, { includeTarget: true });
         } else {
@@ -829,12 +1073,30 @@ export const style1Interactions = {
         await this.requestAssistantForUser(userMessage);
     },
 
+    stopMessageUpdate(messageId) {
+        const activeRequest = this.activeChatRequest;
+        if (!activeRequest || activeRequest.assistantMessageId !== messageId) {
+            return this.showToast('这条消息当前没有正在进行的更新', 'error');
+        }
+        this.closeMessageContextMenu();
+        this.abortActiveChatRequest('stop');
+        this.showToast('已停止本次 AI 生成', 'success');
+    },
+
     deleteMessage(messageId) {
-        if (this.isGenerating) return this.showToast('生成中不能删除消息', 'error');
         const message = this.findVisibleMessage(messageId);
         if (!message) return;
 
+        const activeRequest = this.activeChatRequest;
+        const isCurrentStreamingAssistant = Boolean(activeRequest
+            && message.role === 'assistant'
+            && message.id === activeRequest.assistantMessageId);
+        if (this.isGenerating && !isCurrentStreamingAssistant) {
+            return this.showToast('当前回复生成中，只能删除正在更新的消息', 'error');
+        }
+
         this.closeMessageContextMenu();
+        if (isCurrentStreamingAssistant) this.abortActiveChatRequest('delete');
         if (this.editingMessageId === messageId) this.cancelEditMessage();
         if (message.role === 'assistant') {
             const userMessage = this.getUserForAssistant(message.id);
