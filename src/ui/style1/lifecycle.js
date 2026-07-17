@@ -36,6 +36,9 @@ export const style1Lifecycle = {
         this.currentSummarySelectionReturnFocus = null;
         this.summarySelectionOpenTimerId = null;
         this.summarySelectionRequestSeq = 0;
+        this.lifecycleEpoch = Symbol('ui-lifecycle');
+        this.summaryRequestSeq = 0;
+        this.activeSummaryRequest = null;
         this.chatRequestSeq = 0;
         this.modelListRequestSeq = 0;
         this.modelListAbortController = null;
@@ -53,6 +56,9 @@ export const style1Lifecycle = {
         this.remoteSettingsConflictNotified = false;
         this.postContent = '';
         this.lastSummary = '';
+        this.workspaceTopicId = '';
+        this.workspaceReplacementResolve = null;
+        this.workspaceReplacementReturnFocus = null;
         this.forceRefreshDialogueCache = false;
         this.isGenerating = false;
         this.currentTab = 'summary';
@@ -69,6 +75,7 @@ export const style1Lifecycle = {
         this.rangeMode = 'manual';
         this.exportRangeMode = 'manual';
         this.rangeBoundsTopicId = '';
+        this.exportRangeBoundsTopicId = '';
         this.rangeBoundsLastRefreshAt = 0;
         this.rangeConfirmationPromise = null;
         this.exportRangeConfirmationPromise = null;
@@ -80,6 +87,8 @@ export const style1Lifecycle = {
     },
 
     destroy() {
+        this.closeWorkspaceReplacementConfirm?.(false, { restoreFocus: false });
+        if (this.activeSummaryRequest) this.abortActiveSummaryRequest?.('destroy');
         if (this.activeChatRequest) this.abortActiveChatRequest?.('close');
         this.cancelModelListRequest();
         this._cleanupFns?.forEach((cleanup) => cleanup());
@@ -102,6 +111,7 @@ export const style1Lifecycle = {
         this.currentContentSelection = null;
         this.currentSummarySelection = null;
         this.currentSummarySelectionReturnFocus = null;
+        this.lifecycleEpoch = null;
         this.resetGlobalUiState();
         this.isOpen = false;
     },

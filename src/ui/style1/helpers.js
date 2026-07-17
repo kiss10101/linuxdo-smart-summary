@@ -5,6 +5,7 @@ import { UIRegistry } from '../registry.js';
 export const style1Helpers = {
     async getRangeUpperBound(options = {}) {
         const tid = Core.getTopicId();
+        const lifecycleEpoch = this.lifecycleEpoch;
         if (!tid) return Core.getReplyCount();
 
         try {
@@ -14,9 +15,16 @@ export const style1Helpers = {
                 allowRecentConfirmedCache: options.allowRecentConfirmedCache === true,
                 recentConfirmedMs: options.recentConfirmedMs
             });
+            if ((lifecycleEpoch && !this.isCurrentLifecycleEpoch(lifecycleEpoch)) || tid !== Core.getTopicId()) {
+                return 0;
+            }
             if (bounds.highestPostNumber > 0) {
-                this.rangeBoundsTopicId = tid;
-                this.rangeBoundsLastRefreshAt = Date.now();
+                if (options.scope === 'export') {
+                    this.exportRangeBoundsTopicId = tid;
+                } else {
+                    this.rangeBoundsTopicId = tid;
+                    this.rangeBoundsLastRefreshAt = Date.now();
+                }
                 return bounds.highestPostNumber;
             }
             if (options.allowDomFallback === false) {
@@ -37,6 +45,7 @@ export const style1Helpers = {
         const Q = this.uiManager.Q.bind(this.uiManager);
         const start = Q('#inp-start'), end = Q('#inp-end');
         const tid = Core.getTopicId();
+        const lifecycleEpoch = this.lifecycleEpoch;
         if (!start.value) start.value = 1;
         const isBoundsStale = Date.now() - this.rangeBoundsLastRefreshAt > Core.topicDataCachePolicy.ttlMs;
         const shouldRefresh = !end.value || this.rangeBoundsTopicId !== tid || (isBoundsStale && this.rangeMode !== 'manual');
@@ -47,11 +56,14 @@ export const style1Helpers = {
             console.warn('[Linux.do 智能总结] 楼层元数据预热失败:', error);
         });
         const max = await this.getRangeUpperBound({
+            scope: 'summary',
             forceRefresh: false,
             allowDomFallback: true,
             allowRecentConfirmedCache: true
         });
-        if (requestSeq !== this.rangeRequestSeq || tid !== Core.getTopicId()) return;
+        if (requestSeq !== this.rangeRequestSeq
+            || tid !== Core.getTopicId()
+            || (lifecycleEpoch && !this.isCurrentLifecycleEpoch(lifecycleEpoch))) return;
         if (max && (!end.value || this.rangeMode !== 'manual')) end.value = max;
     },
 
@@ -160,10 +172,15 @@ export const style1Helpers = {
     async setRange(type) {
         const Q = this.uiManager.Q.bind(this.uiManager);
         const tid = Core.getTopicId();
+        const lifecycleEpoch = this.lifecycleEpoch;
         const requestSeq = ++this.rangeRequestSeq;
+        const isCurrentRequest = () => requestSeq === this.rangeRequestSeq
+            && tid === Core.getTopicId()
+            && (!lifecycleEpoch || this.isCurrentLifecycleEpoch(lifecycleEpoch));
         const optimistic = this.applyOptimisticRangeFromCache(type, 'summary');
         this.setRangeButtonsLoading('summary', true, optimistic.applied ? '确认中' : '获取中');
         const confirmation = this.getRangeUpperBound({
+            scope: 'summary',
             forceRefresh: true,
             allowDomFallback: false,
             allowRecentConfirmedCache: true
@@ -171,21 +188,26 @@ export const style1Helpers = {
         this.rangeConfirmationPromise = confirmation;
         try {
             const max = await confirmation;
-            if (requestSeq !== this.rangeRequestSeq || tid !== Core.getTopicId()) return;
-            if (!max) return this.showToast('未获取到最高楼层', 'error');
+            if (!isCurrentRequest()) return false;
+            if (!max) {
+                this.showToast('未获取到最高楼层', 'error');
+                return false;
+            }
             Q('#inp-end').value = max;
             const recentFloors = GM_getValue('recentFloors', 50);
             Q('#inp-start').value = type === 'all' ? 1 : Math.max(1, max - recentFloors + 1);
             this.rangeMode = type;
             this.showToast(optimistic.applied && optimistic.max !== max ? `已校准到最新楼层 ${max}` : '已获取最新楼层范围', 'success');
+            return true;
         } catch (e) {
-            if (requestSeq === this.rangeRequestSeq) {
+            if (isCurrentRequest()) {
                 this.restoreOptimisticRange('summary', optimistic);
                 this.showToast(`获取最新楼层失败: ${e.message || e}`, 'error');
             }
+            return false;
         } finally {
             if (this.rangeConfirmationPromise === confirmation) this.rangeConfirmationPromise = null;
-            if (requestSeq === this.rangeRequestSeq) this.setRangeButtonsLoading('summary', false);
+            if (isCurrentRequest()) this.setRangeButtonsLoading('summary', false);
         }
     },
 
@@ -520,10 +542,15 @@ export const style1Helpers = {
     async setExportRange(type) {
         const Q = this.uiManager.Q.bind(this.uiManager);
         const tid = Core.getTopicId();
+        const lifecycleEpoch = this.lifecycleEpoch;
         const requestSeq = ++this.exportRangeRequestSeq;
+        const isCurrentRequest = () => requestSeq === this.exportRangeRequestSeq
+            && tid === Core.getTopicId()
+            && (!lifecycleEpoch || this.isCurrentLifecycleEpoch(lifecycleEpoch));
         const optimistic = this.applyOptimisticRangeFromCache(type, 'export');
         this.setRangeButtonsLoading('export', true, optimistic.applied ? '确认中' : '获取中');
         const confirmation = this.getRangeUpperBound({
+            scope: 'export',
             forceRefresh: true,
             allowDomFallback: false,
             allowRecentConfirmedCache: true
@@ -531,21 +558,26 @@ export const style1Helpers = {
         this.exportRangeConfirmationPromise = confirmation;
         try {
             const max = await confirmation;
-            if (requestSeq !== this.exportRangeRequestSeq || tid !== Core.getTopicId()) return;
-            if (!max) return this.showToast('未获取到最高楼层', 'error');
+            if (!isCurrentRequest()) return false;
+            if (!max) {
+                this.showToast('未获取到最高楼层', 'error');
+                return false;
+            }
             Q('#export-end').value = max;
             const recentFloors = GM_getValue('recentFloors', 50);
             Q('#export-start').value = type === 'all' ? 1 : Math.max(1, max - recentFloors + 1);
             this.exportRangeMode = type;
             this.showToast(optimistic.applied && optimistic.max !== max ? `已校准到最新楼层 ${max}` : '已获取最新导出范围', 'success');
+            return true;
         } catch (e) {
-            if (requestSeq === this.exportRangeRequestSeq) {
+            if (isCurrentRequest()) {
                 this.restoreOptimisticRange('export', optimistic);
                 this.showToast(`获取最新楼层失败: ${e.message || e}`, 'error');
             }
+            return false;
         } finally {
             if (this.exportRangeConfirmationPromise === confirmation) this.exportRangeConfirmationPromise = null;
-            if (requestSeq === this.exportRangeRequestSeq) this.setRangeButtonsLoading('export', false);
+            if (isCurrentRequest()) this.setRangeButtonsLoading('export', false);
         }
     },
 
@@ -555,6 +587,9 @@ export const style1Helpers = {
         const exportType = Q('#export-type').value;
 
         if (!tid) return this.showToast('未检测到帖子ID', 'error');
+        if (['all', 'recent'].includes(this.exportRangeMode) && this.exportRangeBoundsTopicId !== tid) {
+            if (!await this.setExportRange(this.exportRangeMode)) return;
+        }
         if (!await this.waitForRangeConfirmation('export')) return;
         let start = parseInt(Q('#export-start').value, 10);
         let end = parseInt(Q('#export-end').value, 10);
@@ -564,7 +599,7 @@ export const style1Helpers = {
         }
         if (!end) {
             try {
-                end = await this.getRangeUpperBound({ forceRefresh: true, allowDomFallback: false });
+                end = await this.getRangeUpperBound({ scope: 'export', forceRefresh: true, allowDomFallback: false });
             } catch (e) {
                 return this.showToast(`获取最新楼层失败: ${e.message || e}`, 'error');
             }

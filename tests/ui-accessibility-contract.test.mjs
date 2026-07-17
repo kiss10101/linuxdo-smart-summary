@@ -83,6 +83,28 @@ test('both themes render semantic tabs and keyboard navigation remains shared', 
     assert.match(style1StateSource, /panel\.hidden\s*=\s*!active/);
 });
 
+test('both themes expose accessible workspace source and replacement confirmation surfaces', () => {
+    for (const source of [style1PresentationSource, style2Source]) {
+        assert.match(source, /id="workspace-source-status-summary"[^>]*role="status"[^>]*hidden/);
+        assert.match(source, /id="workspace-source-status-chat"[^>]*role="status"[^>]*hidden/);
+        assert.match(source, /id="workspace-replace-modal"[^>]*aria-hidden="true"/);
+        assert.match(source, /role="dialog"[^>]*aria-modal="true"[^>]*aria-labelledby="workspace-replace-title"/);
+        assert.match(source, /aria-describedby="workspace-replace-message"/);
+        assert.match(source, /id="btn-confirm-workspace-replace"[^>]*>总结当前主题</);
+        assert.match(source, /id="btn-cancel-workspace-replace"[^>]*>取消</);
+    }
+    assert.match(style1EventsSource, /btn-confirm-workspace-replace/);
+    assert.match(style1EventsSource, /btn-cancel-workspace-replace/);
+    assert.match(style1EventsSource, /workspace-replace-modal/);
+    assert.match(style1EventsSource, /Escape/);
+    assert.match(style1EventsSource, /e\.key !== 'Tab'/);
+    assert.match(style1EventsSource, /querySelectorAll\('button:not\(\[disabled\]\)'\)/);
+    assert.match(style1EventsSource, /modal\.getRootNode\(\)\.activeElement/);
+    assert.doesNotMatch(style1EventsSource, /document\.activeElement === (?:first|last)/);
+    assert.match(style1StateSource, /workspaceReplacementReturnFocus/);
+    assert.match(style1StateSource, /\.focus\(\)/);
+});
+
 test('Style2 provides a no-squeeze narrow fallback and reduced-motion contract', () => {
     assert.match(style2Source, /window\.innerWidth\s*<=\s*700/);
     assert.match(style2Source, /classList\.toggle\(['"]narrow-viewport['"]/);

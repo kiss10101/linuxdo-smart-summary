@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "7.8.0-alpha.3",
+    [string]$Version = "7.8.0-alpha.4",
     [switch]$All,
     [switch]$SkipVerify
 )
@@ -8,6 +8,22 @@ $ErrorActionPreference = "Stop"
 
 $repo = "kiss10101/linuxdo-smart-summary"
 $releases = @(
+    @{
+        Tag          = "v7.8.0-alpha.4"
+        Name         = "v7.8.0-alpha.4"
+        AssetPattern = "*7.8.0-alpha.4.user.js"
+        AssetName    = "linuxdo-smart-summary-7.8.0-alpha.4.user.js"
+        Prerelease   = $true
+        Body         = @"
+7.8.0-alpha.4 SPA workspace-lifecycle correction preview.
+
+- Preserves the active summary and follow-up conversation across direct Linux.do topic-to-topic navigation, including browser back and forward.
+- Shows the retained workspace source and confirms before a summary on another topic replaces it.
+- Keeps in-flight summaries bound to their source topic and rejects stale callbacks after UI teardown.
+- Recalculates automatic summary and export ranges for the destination topic while retaining normal teardown outside topic routes.
+- Adds focused route, replacement, request-ownership, range-lifecycle, accessibility, and release regression coverage.
+"@
+    },
     @{
         Tag          = "v7.8.0-alpha.3"
         Name         = "v7.8.0-alpha.3"

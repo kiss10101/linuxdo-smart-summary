@@ -102,6 +102,7 @@ export const style1Presentation = {
     .btn-xs { padding: 8px 14px; font-size: 12px; font-family: inherit; background: var(--bg-card); color: var(--text-main); border-radius: var(--radius-sm); border: 1.5px solid var(--border-light); cursor: pointer; white-space: nowrap; font-weight: 600; transition: all var(--transition-fast); }
     .btn-xs:hover { background: var(--primary); color: var(--text-inverse); border-color: var(--primary); transform: translateY(-1px); }
     .btn-xs:disabled, .btn-xs.loading { opacity: 0.62; cursor: wait; transform: none; }
+    .workspace-source-status { margin-top: 12px; padding: 10px 12px; color: var(--text-sec); background: var(--bg-hover); border: 1px solid var(--border-light); border-radius: var(--radius-sm); font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
     .summary-result-wrapper { position: relative; }
     .result-box { margin-top: 20px; padding: 24px 24px 24px 28px; background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--radius-lg); font-size: 14px; line-height: 1.8; color: var(--text-main); min-height: 180px; max-height: calc(100vh - 380px); overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable; word-break: break-word; box-shadow: var(--shadow-sm); position: relative; direction: rtl; text-align: start; }
     .result-box > * { direction: ltr; unicode-bidi: isolate; }
@@ -285,17 +286,19 @@ export const style1Presentation = {
     .model-input-row { display: flex; gap: 10px; align-items: center; }
     .model-input-row input { flex: 1; min-width: 0; }
     .model-fetch-btn { flex: 0 0 auto; padding: 0 14px; height: 48px; }
-    .model-picker-overlay { position: absolute; inset: 0; z-index: 10002; display: none; align-items: center; justify-content: center; padding: 22px; background: rgba(45, 37, 32, 0.42); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
-    .model-picker-overlay.show { display: flex; }
-    .model-picker-dialog { width: 100%; max-width: 380px; max-height: 72vh; display: flex; flex-direction: column; background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--radius-lg); box-shadow: var(--shadow-xl); overflow: hidden; }
-    .model-picker-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid var(--border-light); }
-    .model-picker-title { font-size: 14px; font-weight: 700; color: var(--text-main); }
+    .model-picker-overlay, .workspace-replace-overlay { position: absolute; inset: 0; z-index: 10002; display: none; align-items: center; justify-content: center; padding: 22px; background: rgba(45, 37, 32, 0.42); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+    .model-picker-overlay.show, .workspace-replace-overlay.show { display: flex; }
+    .model-picker-dialog, .workspace-replace-dialog { width: 100%; max-width: 380px; max-height: 72vh; display: flex; flex-direction: column; background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--radius-lg); box-shadow: var(--shadow-xl); overflow: hidden; }
+    .model-picker-header, .workspace-replace-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid var(--border-light); }
+    .model-picker-title, .workspace-replace-title { font-size: 14px; font-weight: 700; color: var(--text-main); }
     .model-picker-status { padding: 12px 18px; color: var(--text-sec); font-size: 12px; line-height: 1.5; border-bottom: 1px solid var(--border-light); }
     .model-picker-status.error { color: var(--danger); }
     .model-picker-list { flex: 1; min-height: 120px; overflow-y: auto; padding: 8px; }
     .model-option { width: 100%; padding: 10px 12px; border: none; border-radius: var(--radius-sm); background: transparent; color: var(--text-main); text-align: left; font: inherit; font-size: 13px; cursor: pointer; transition: background var(--transition-fast), color var(--transition-fast); overflow-wrap: anywhere; }
     .model-option:hover { background: var(--bg-hover); color: var(--primary); }
-    .model-picker-actions { display: flex; gap: 8px; justify-content: flex-end; padding: 12px 18px 16px; border-top: 1px solid var(--border-light); }
+    .model-picker-actions, .workspace-replace-actions { display: flex; gap: 8px; justify-content: flex-end; padding: 12px 18px 16px; border-top: 1px solid var(--border-light); }
+    .workspace-replace-message { padding: 18px; color: var(--text-sec); font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
+    #btn-confirm-workspace-replace { color: var(--text-inverse); background: var(--primary); border-color: var(--primary); }
     .toggle-switch { position: relative; width: 52px; height: 28px; flex-shrink: 0; }
     .toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
     .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: var(--border-medium); border-radius: var(--radius-full); transition: all var(--transition-normal); }
@@ -384,6 +387,19 @@ export const style1Presentation = {
                         </div>
                     </div>
                 </div>
+                <div class="workspace-replace-overlay" id="workspace-replace-modal" aria-hidden="true">
+                    <div class="workspace-replace-dialog" role="dialog" aria-modal="true" aria-labelledby="workspace-replace-title" aria-describedby="workspace-replace-message">
+                        <div class="workspace-replace-header">
+                            <div class="workspace-replace-title" id="workspace-replace-title">替换当前工作区？</div>
+                            <button type="button" class="icon-btn" id="btn-close-workspace-replace" data-tooltip="关闭" aria-label="关闭替换确认">✕</button>
+                        </div>
+                        <div class="workspace-replace-message" id="workspace-replace-message"></div>
+                        <div class="workspace-replace-actions">
+                            <button type="button" class="btn-xs" id="btn-cancel-workspace-replace">取消</button>
+                            <button type="button" class="btn-xs" id="btn-confirm-workspace-replace">总结当前主题</button>
+                        </div>
+                    </div>
+                </div>
                 <!-- Header -->
                 <div class="header">
                     <div class="header-title">
@@ -425,6 +441,7 @@ export const style1Presentation = {
                             <span class="btn-text">✨ 开始智能总结</span>
                         </button>
                         <button class="btn-xs" id="btn-refresh-summary-cache" style="margin-top:8px;width:100%;">重新获取楼层</button>
+                        <div class="workspace-source-status" id="workspace-source-status-summary" role="status" hidden></div>
                         <div class="summary-result-wrapper">
                             <div id="summary-result" class="result-box empty">
                                 <div class="tip-text">
@@ -453,6 +470,7 @@ export const style1Presentation = {
                                     🗑️ 清空
                                 </button>
                             </div>
+                            <div class="workspace-source-status" id="workspace-source-status-chat" role="status" hidden></div>
                             <div class="chat-messages-wrapper">
                                 <div class="scroll-buttons top-area">
                                     <button type="button" class="scroll-btn" id="btn-scroll-top" title="滚动到顶部" aria-label="滚动到顶部" aria-hidden="true" tabindex="-1">${arrowUpIcon}</button>

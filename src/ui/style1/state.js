@@ -211,6 +211,151 @@ export const style1State = {
         return scope === 'summary' ? '#btn-summary' : '#btn-send';
     },
 
+    isCurrentLifecycleEpoch(epoch) {
+        return Boolean(epoch && this.lifecycleEpoch === epoch);
+    },
+
+    beginSummaryRequestLifecycle({ topicId }) {
+        const request = {
+            token: (this.summaryRequestSeq || 0) + 1,
+            lifecycleEpoch: this.lifecycleEpoch,
+            topicId: String(topicId || ''),
+            controller: null,
+            phase: 'preparing',
+            abortReason: ''
+        };
+        this.summaryRequestSeq = request.token;
+        this.activeSummaryRequest = request;
+        return request;
+    },
+
+    attachSummaryAbortController(request, controller) {
+        if (!this.isCurrentSummaryRequest(request)) return false;
+        request.controller = controller;
+        request.phase = 'streaming';
+        return true;
+    },
+
+    isCurrentSummaryRequest(request) {
+        return Boolean(request
+            && this.activeSummaryRequest === request
+            && request.token === this.summaryRequestSeq
+            && this.isCurrentLifecycleEpoch(request.lifecycleEpoch)
+            && !request.abortReason);
+    },
+
+    abortActiveSummaryRequest(reason = 'destroy') {
+        const request = this.activeSummaryRequest;
+        if (!request) return null;
+        request.abortReason = reason;
+        request.phase = reason === 'destroy' ? 'destroyed' : 'stopped';
+        this.summaryRequestSeq = Math.max(this.summaryRequestSeq || 0, request.token) + 1;
+        this.activeSummaryRequest = null;
+        this.cancelSummaryRender?.();
+        if (request.controller && !request.controller.signal.aborted) {
+            request.controller.abort(reason);
+        }
+        if (request.controller) this.clearAiAbortController?.(request.controller);
+        return request;
+    },
+
+    finalizeSummaryRequest(request, phase = 'completed') {
+        if (!this.isCurrentSummaryRequest(request)) return false;
+        request.phase = phase;
+        this.activeSummaryRequest = null;
+        return true;
+    },
+
+    hasWorkspaceContent() {
+        const resultBox = this.uiManager?.Q?.('#summary-result');
+        const hasRenderedSummary = Boolean(resultBox && !resultBox.classList?.contains?.('empty'));
+        return Boolean(
+            `${this.lastSummary || ''}`.trim()
+            || `${this.postContent || ''}`.trim()
+            || this.chatSession?.context
+            || this.chatSession?.visibleMessages?.length
+            || hasRenderedSummary
+        );
+    },
+
+    getWorkspaceReplacementContext(targetTopicId) {
+        const sourceTopicId = String(this.workspaceTopicId || this.chatSession?.context?.topicId || '');
+        const normalizedTarget = String(targetTopicId || '');
+        if (!sourceTopicId || !normalizedTarget || sourceTopicId === normalizedTarget || !this.hasWorkspaceContent()) {
+            return null;
+        }
+        return { sourceTopicId, targetTopicId: normalizedTarget };
+    },
+
+    setWorkspaceTopicId(topicId) {
+        this.workspaceTopicId = String(topicId || '');
+        this.updateWorkspaceSourceStatus();
+    },
+
+    updateWorkspaceSourceStatus() {
+        const currentTopicId = String(Core.getTopicId() || '');
+        const sourceTopicId = String(this.workspaceTopicId || this.chatSession?.context?.topicId || '');
+        const visible = Boolean(sourceTopicId && currentTopicId && sourceTopicId !== currentTopicId && this.hasWorkspaceContent());
+        const text = visible
+            ? `当前保留主题 #${sourceTopicId} 的总结与对话；当前页面为主题 #${currentTopicId}。`
+            : '';
+        ['#workspace-source-status-summary', '#workspace-source-status-chat'].forEach((selector) => {
+            const status = this.uiManager?.Q?.(selector);
+            if (!status) return;
+            status.hidden = !visible;
+            status.textContent = text;
+        });
+    },
+
+    requestWorkspaceReplacementConfirm({ sourceTopicId, targetTopicId }) {
+        const modal = this.uiManager.Q('#workspace-replace-modal');
+        const message = this.uiManager.Q('#workspace-replace-message');
+        if (!modal || !message) {
+            return Promise.resolve(window.confirm(
+                `当前保留主题 #${sourceTopicId} 的总结和对话。总结主题 #${targetTopicId} 将清空并替换这些内容。`
+            ));
+        }
+        this.closeWorkspaceReplacementConfirm(false, { restoreFocus: false });
+        message.textContent = `当前保留主题 #${sourceTopicId} 的总结和对话。总结主题 #${targetTopicId} 将清空并替换这些内容。`;
+        modal.classList.add('show');
+        modal.setAttribute('aria-hidden', 'false');
+        this.workspaceReplacementReturnFocus = this.uiManager.Q('#btn-summary');
+        this.requestManagedFrame(() => this.uiManager.Q('#btn-confirm-workspace-replace')?.focus());
+        return new Promise(resolve => {
+            this.workspaceReplacementResolve = resolve;
+        });
+    },
+
+    closeWorkspaceReplacementConfirm(confirmed = false, options = {}) {
+        const modal = this.uiManager?.Q?.('#workspace-replace-modal');
+        if (modal) {
+            modal.classList.remove('show');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+        const resolve = this.workspaceReplacementResolve;
+        const returnFocus = this.workspaceReplacementReturnFocus;
+        this.workspaceReplacementResolve = null;
+        this.workspaceReplacementReturnFocus = null;
+        if (resolve) resolve(Boolean(confirmed));
+        if (options.restoreFocus !== false) returnFocus?.focus?.();
+    },
+
+    onTopicRouteChange() {
+        this.closeMessageContextMenu?.();
+        this.closeSummarySelectionMenu?.();
+        this.closeWorkspaceReplacementConfirm(false);
+        this.rangeRequestSeq = (this.rangeRequestSeq || 0) + 1;
+        this.exportRangeRequestSeq = (this.exportRangeRequestSeq || 0) + 1;
+        this.rangeConfirmationPromise = null;
+        this.exportRangeConfirmationPromise = null;
+        this.rangeBoundsTopicId = '';
+        this.exportRangeBoundsTopicId = '';
+        this.rangeBoundsLastRefreshAt = 0;
+        this.setRangeButtonsLoading?.('summary', false);
+        this.setRangeButtonsLoading?.('export', false);
+        this.updateWorkspaceSourceStatus();
+    },
+
     startAiAbortController(scope) {
         const controller = new AbortController();
         this.currentAiAbortController = controller;
@@ -223,6 +368,7 @@ export const style1State = {
         const requestController = controller || this.startAiAbortController('chat');
         const request = {
             token: (this.chatRequestSeq || 0) + 1,
+            lifecycleEpoch: this.lifecycleEpoch,
             controller: requestController,
             userMessageId,
             assistantMessageId,
@@ -240,6 +386,7 @@ export const style1State = {
         return Boolean(request
             && this.activeChatRequest === request
             && request.token === this.chatRequestSeq
+            && (!request.lifecycleEpoch || this.isCurrentLifecycleEpoch(request.lifecycleEpoch))
             && !request.abortReason);
     },
 

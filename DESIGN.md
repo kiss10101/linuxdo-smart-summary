@@ -164,13 +164,14 @@ The first modular release intentionally preserved behavior and accepted several 
 presentation or orchestration modules behind composition roots. Alpha.2 split presentation
 concerns only where required by its approved UI work; alpha.3 reuses the existing shared
 selection, menu, and settings boundaries rather than introducing another theme framework or
-selection plugin system. Further unrelated decomposition remains maintenance work, not another
-release stage.
+selection plugin system. Alpha.4 changes only the existing route and request lifecycle
+boundaries so one in-memory workspace can survive topic-to-topic navigation safely. Further
+unrelated decomposition remains maintenance work, not another release stage.
 
 ## Short Release Route
 
 ```text
-7.8.0-alpha.1 -> 7.8.0-alpha.2 -> 7.8.0-alpha.3 -> 7.8.0-beta.1 -> 7.8.0
+7.8.0-alpha.1 -> 7.8.0-alpha.2 -> 7.8.0-alpha.3 -> 7.8.0-alpha.4 -> 7.8.0-beta.1 -> 7.8.0
 ```
 
 - `alpha.1`: validates source/build equivalence, module boundaries, and maintainer workflow.
@@ -178,13 +179,16 @@ release stage.
   UI feature gate.
 - `alpha.3`: user-approved final feature gate for completed-reply selection, configurable
   floating-menu opacity, compact message actions, and consistent left-side reading scrollbars.
+- `alpha.4`: explicitly approved lifecycle-fix exception that preserves one summary/chat
+  workspace across topic navigation, identifies its source, confirms replacement, and keeps
+  in-flight work and automatic ranges bound to the correct topic.
 - `beta.1`: reserved for real-user compatibility fixes found in alpha; no new features.
 - `7.8.0`: stable promotion after beta acceptance; no architecture expansion.
 
-Alpha.3 is the last planned feature gate and was added only after explicit user approval of
-the completed-reply and floating-menu scope. There are no planned further alpha or release-
-candidate stages. Beta.1 remains limited to real-user compatibility and defect closure; new
-features must not be moved into beta. The five-gate route is stored in
+Alpha.3 remains the last feature gate. Alpha.4 is a separately approved, bounded correction to
+SPA workspace lifetime and does not reopen feature scope. There are no planned further alpha or
+release-candidate stages. Beta.1 remains limited to real-user compatibility and defect closure;
+new features must not be moved into beta. The six-stage route is stored in
 `tools/release-manifest.json` and enforced by release verification.
 
 ## GitHub Automation
@@ -212,6 +216,26 @@ Recommended repository settings are:
 5. Commit source and its matching generated artifact as one reviewable change.
 
 ## Change History
+
+### 2026-07-17 - SPA workspace lifecycle correction
+
+**Change**: Added alpha.4 to preserve the current summary and conversation across Linux.do
+topic-to-topic SPA navigation, display the source topic, confirm cross-topic replacement, and
+bind active summary/range work to the topic that initiated it.
+
+**Reason**: Rebuilding the sidebar on every direct topic navigation discarded useful in-memory
+work and made accidental navigation consume another summary request. Preserving one workspace
+restores the earlier user workflow while explicit source and replacement states prevent silent
+cross-topic mixing.
+
+**Impact**: Route bootstrap ownership, shared UI request lifecycle, topic-bound range
+invalidation, two accessible source/confirmation surfaces, focused regression tests, release
+metadata, and the generated preview asset. Stored settings, provider schemas, Linux.do request
+cadence, public runtime APIs, and theme selection remain unchanged.
+
+**Decision**: Treat alpha.4 as a one-time lifecycle-fix exception after the final alpha.3
+feature gate. Topic-to-topic navigation preserves the workspace; leaving topic routes destroys
+it; beta.1 remains compatibility/defect-only.
 
 ### 2026-07-17 - Final user-approved feature gate
 

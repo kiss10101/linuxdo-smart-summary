@@ -1211,6 +1211,9 @@ export const style1Interactions = {
         const Q = this.uiManager.Q.bind(this.uiManager);
         const tid = Core.getTopicId();
         if (!tid) return this.showToast('未检测到帖子ID', 'error');
+        if (['all', 'recent'].includes(this.rangeMode) && this.rangeBoundsTopicId !== tid) {
+            if (!await this.setRange(this.rangeMode)) return;
+        }
         if (!await this.waitForRangeConfirmation('summary')) return;
         let start = parseInt(Q('#inp-start').value, 10);
         let end = parseInt(Q('#inp-end').value, 10);
@@ -1220,7 +1223,7 @@ export const style1Interactions = {
         }
         if (!end) {
             try {
-                end = await this.getRangeUpperBound({ forceRefresh: true, allowDomFallback: false });
+                end = await this.getRangeUpperBound({ scope: 'summary', forceRefresh: true, allowDomFallback: false });
             } catch (e) {
                 return this.showToast(`获取最新楼层失败: ${e.message || e}`, 'error');
             }
@@ -1228,7 +1231,21 @@ export const style1Interactions = {
         }
         if (!start || !end || start > end) return this.showToast('楼层范围无效', 'error');
 
+        const replacement = this.getWorkspaceReplacementContext(tid);
+        if (replacement && !await this.requestWorkspaceReplacementConfirm(replacement)) return;
+
+        const request = this.beginSummaryRequestLifecycle({ topicId: tid });
+        const settleRequest = (phase) => {
+            if (!this.isCurrentSummaryRequest(request)) return false;
+            const controller = request.controller;
+            this.finalizeSummaryRequest(request, phase);
+            if (controller) this.clearAiAbortController(controller);
+            this.setLoading('#btn-summary', false);
+            return true;
+        };
+
         this.clearChatContext();
+        this.setWorkspaceTopicId(tid);
         Q('#chat-list').innerHTML = '';
         Q('#chat-empty').classList.remove('hidden');
         Q('#chat-empty').innerHTML = '<span class="tip-icon">💬</span>请先完成本次总结，<br>然后即可基于新上下文进行对话';
@@ -1246,12 +1263,14 @@ export const style1Interactions = {
             const forceRefresh = this.forceRefreshDialogueCache === true;
             this.forceRefreshDialogueCache = false;
             const { text, cacheHit, cacheEntry, rangeMapping } = await Core.fetchDialoguesCached(tid, start, end, (progress) => {
+                if (!this.isCurrentSummaryRequest(request)) return;
                 const progressText = Core.escapeHtml(Core.getFetchProgressText(progress, '帖子内容'));
                 resultBox.innerHTML = `<div style="display:flex;align-items:center;gap:10px;"><div class="thinking"><div class="thinking-dot"></div><div class="thinking-dot"></div><div class="thinking-dot"></div></div>${progressText}</div>`;
                 this.updateSummaryScrollButton();
             }, {
                 forceRefresh
             });
+            if (!this.isCurrentSummaryRequest(request)) return;
             if (!text) throw new Error('未获取到内容');
             this.postContent = text;
             const coverageReport = Core.buildSummaryCoverageReport({
@@ -1272,12 +1291,18 @@ export const style1Interactions = {
 
             const outputState = Core.createAiOutputState();
             const abortController = this.startAiAbortController('summary');
+            if (!this.attachSummaryAbortController(request, abortController)) {
+                abortController.abort('stale');
+                return;
+            }
             await Core.streamChat(messages,
                 (event) => {
+                    if (!this.isCurrentSummaryRequest(request)) return;
                     Core.applyAiOutputEvent(outputState, event);
                     this.scheduleSummaryRender(resultBox, () => outputState);
                 },
                 (meta = {}) => {
+                    if (!this.isCurrentSummaryRequest(request)) return;
                     this.cancelSummaryRender();
                     Core.finishAiOutputState(outputState, meta);
                     const classified = Core.classifyAiOutput(outputState, meta);
@@ -1287,8 +1312,6 @@ export const style1Interactions = {
                             sourceConfig: meta.sourceConfig
                         });
                         const formatted = Core.formatAiFailureForUi(failure);
-                        this.clearAiAbortController(abortController);
-                        this.setLoading('#btn-summary', false);
                         const hasOutput = Boolean(outputState.reasoningText.trim() || outputState.contentText.trim());
                         if (hasOutput) {
                             this.updateResultBox(resultBox, outputState, false, coverageReport, failure.sourceConfig, failure);
@@ -1297,11 +1320,10 @@ export const style1Interactions = {
                         }
                         this.updateSummaryScrollButton();
                         this.showToast('总结失败: ' + formatted.toast, 'error');
+                        settleRequest('failed');
                         return;
                     }
                     const sourceConfig = Core.normalizeAiSourceConfig(meta.sourceConfig);
-                    this.clearAiAbortController(abortController);
-                    this.setLoading('#btn-summary', false);
                     this.updateResultBox(resultBox, outputState, false, coverageReport, sourceConfig);
                     this.setChatContext({
                         topicId: tid,
@@ -1316,8 +1338,11 @@ export const style1Interactions = {
                     this.renderChatMessages();
                     Q('#chat-empty').classList.remove('hidden');
                     Q('#chat-empty').innerHTML = '<span class="tip-icon">✅</span>总结已完成！<br>现在可以基于帖子内容进行对话';
+                    this.updateWorkspaceSourceStatus();
+                    settleRequest('completed');
                 },
                 (err) => {
+                    if (!this.isCurrentSummaryRequest(request)) return;
                     this.cancelSummaryRender();
                     const failure = Core.normalizeAiFailure(err, { operation: 'summary' });
                     const formatted = Core.formatAiFailureForUi(failure);
@@ -1330,18 +1355,18 @@ export const style1Interactions = {
                         resultBox.innerHTML = Core.renderAiFailureBlock(failure, { operation: 'summary' });
                         this.updateSummaryScrollButton();
                     }
-                    this.clearAiAbortController(abortController);
-                    this.setLoading('#btn-summary', false);
                     if (!wasAborted) {
                         this.showToast('总结失败: ' + formatted.toast, 'error');
                     }
+                    settleRequest(wasAborted ? 'stopped' : 'failed');
                 },
                 { operation: 'summary', signal: abortController.signal }
             );
         } catch (e) {
+            if (!this.isCurrentSummaryRequest(request)) return;
             resultBox.innerHTML = `<div style="color:var(--danger)">❌ 错误: ${Core.escapeHtml(e.message || e)}</div>`;
             this.updateSummaryScrollButton();
-            this.setLoading('#btn-summary', false);
+            settleRequest('failed');
         }
     },
 

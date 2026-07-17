@@ -36,14 +36,15 @@ const failures = [];
 const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
 const release = manifest.releases.find((item) => item.version === version);
 
-if (!Array.isArray(manifest.releaseRoute) || manifest.releaseRoute.length !== 5) {
-  fail('release-manifest: releaseRoute must contain exactly alpha.1, alpha.2, alpha.3, beta.1, and stable');
+if (!Array.isArray(manifest.releaseRoute) || manifest.releaseRoute.length !== 6) {
+  fail('release-manifest: releaseRoute must contain exactly alpha.1, alpha.2, alpha.3, alpha.4, beta.1, and stable');
 } else {
-  const baseVersion = manifest.releaseRoute[4];
+  const baseVersion = manifest.releaseRoute[5];
   const expectedRoute = [
     `${baseVersion}-alpha.1`,
     `${baseVersion}-alpha.2`,
     `${baseVersion}-alpha.3`,
+    `${baseVersion}-alpha.4`,
     `${baseVersion}-beta.1`,
     baseVersion
   ];

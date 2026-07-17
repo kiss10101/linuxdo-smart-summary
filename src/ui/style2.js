@@ -52,6 +52,9 @@ UIRegistry.register('style2', {
         this.currentSummarySelectionReturnFocus = null;
         this.summarySelectionOpenTimerId = null;
         this.summarySelectionRequestSeq = 0;
+        this.lifecycleEpoch = Symbol('ui-lifecycle');
+        this.summaryRequestSeq = 0;
+        this.activeSummaryRequest = null;
         this.chatRequestSeq = 0;
         this.modelListRequestSeq = 0;
         this.modelListAbortController = null;
@@ -69,6 +72,9 @@ UIRegistry.register('style2', {
         this.remoteSettingsConflictNotified = false;
         this.postContent = '';
         this.lastSummary = '';
+        this.workspaceTopicId = '';
+        this.workspaceReplacementResolve = null;
+        this.workspaceReplacementReturnFocus = null;
         this.forceRefreshDialogueCache = false;
         this.isGenerating = false;
         this.currentTab = 'summary';
@@ -85,6 +91,7 @@ UIRegistry.register('style2', {
         this.rangeMode = 'manual';
         this.exportRangeMode = 'manual';
         this.rangeBoundsTopicId = '';
+        this.exportRangeBoundsTopicId = '';
         this.rangeBoundsLastRefreshAt = 0;
         this.rangeConfirmationPromise = null;
         this.exportRangeConfirmationPromise = null;
@@ -138,6 +145,19 @@ UIRegistry.register('style2', {
                         </div>
                     </div>
                 </div>
+                <div class="workspace-replace-overlay" id="workspace-replace-modal" aria-hidden="true">
+                    <div class="workspace-replace-dialog" role="dialog" aria-modal="true" aria-labelledby="workspace-replace-title" aria-describedby="workspace-replace-message">
+                        <div class="workspace-replace-header">
+                            <div class="workspace-replace-title" id="workspace-replace-title">替换当前工作区？</div>
+                            <button type="button" class="icon-btn" id="btn-close-workspace-replace" data-tooltip="关闭" title="关闭替换确认" aria-label="关闭替换确认">${this.ICONS.close}</button>
+                        </div>
+                        <div class="workspace-replace-message" id="workspace-replace-message"></div>
+                        <div class="workspace-replace-actions">
+                            <button type="button" class="btn-xs" id="btn-cancel-workspace-replace">取消</button>
+                            <button type="button" class="btn-xs" id="btn-confirm-workspace-replace">总结当前主题</button>
+                        </div>
+                    </div>
+                </div>
                 <div class="header">
                     <div class="header-title">
                         <div class="header-title-icon">${this.ICONS.brain}</div>
@@ -175,6 +195,7 @@ UIRegistry.register('style2', {
                              <span class="btn-text" style="display:flex;align-items:center;gap:6px;">${this.ICONS.sparkles} 开始智能总结</span>
                          </button>
                          <button type="button" class="btn-xs" id="btn-refresh-summary-cache" style="margin-top:8px;width:100%;">重新获取楼层</button>
+                         <div class="workspace-source-status" id="workspace-source-status-summary" role="status" hidden></div>
                          <div class="summary-result-wrapper">
                              <div id="summary-result" class="result-box empty">
                                  <div class="tip-text">
@@ -200,6 +221,7 @@ UIRegistry.register('style2', {
                                      ${this.ICONS.trash} 清空
                                  </button>
                              </div>
+                             <div class="workspace-source-status" id="workspace-source-status-chat" role="status" hidden></div>
                              <div class="chat-messages-wrapper">
                                  <div class="scroll-buttons top-area"><button type="button" class="scroll-btn" id="btn-scroll-top" title="滚动到顶部" aria-label="滚动到顶部" aria-hidden="true" tabindex="-1">${this.ICONS.arrowUp}</button></div>
                                  <div class="chat-messages" id="chat-messages">
@@ -560,6 +582,19 @@ UIRegistry.register('style2', {
         if (btnId === '#btn-send') button.setAttribute('aria-label', isActive ? '停止生成' : '发送消息');
     },
     getAiAbortButtonSelector: UIRegistry.get('style1').getAiAbortButtonSelector,
+    isCurrentLifecycleEpoch: UIRegistry.get('style1').isCurrentLifecycleEpoch,
+    beginSummaryRequestLifecycle: UIRegistry.get('style1').beginSummaryRequestLifecycle,
+    attachSummaryAbortController: UIRegistry.get('style1').attachSummaryAbortController,
+    isCurrentSummaryRequest: UIRegistry.get('style1').isCurrentSummaryRequest,
+    abortActiveSummaryRequest: UIRegistry.get('style1').abortActiveSummaryRequest,
+    finalizeSummaryRequest: UIRegistry.get('style1').finalizeSummaryRequest,
+    hasWorkspaceContent: UIRegistry.get('style1').hasWorkspaceContent,
+    getWorkspaceReplacementContext: UIRegistry.get('style1').getWorkspaceReplacementContext,
+    setWorkspaceTopicId: UIRegistry.get('style1').setWorkspaceTopicId,
+    updateWorkspaceSourceStatus: UIRegistry.get('style1').updateWorkspaceSourceStatus,
+    requestWorkspaceReplacementConfirm: UIRegistry.get('style1').requestWorkspaceReplacementConfirm,
+    closeWorkspaceReplacementConfirm: UIRegistry.get('style1').closeWorkspaceReplacementConfirm,
+    onTopicRouteChange: UIRegistry.get('style1').onTopicRouteChange,
     startAiAbortController: UIRegistry.get('style1').startAiAbortController,
     clearAiAbortController: UIRegistry.get('style1').clearAiAbortController,
     stopCurrentAiGeneration: UIRegistry.get('style1').stopCurrentAiGeneration,

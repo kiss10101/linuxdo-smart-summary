@@ -77,6 +77,7 @@ expectIncludes('this.exportRangeConfirmationPromise = null', 'export range confi
 expectIncludes("this.rangeMode = 'manual'", 'summary range mode state');
 expectIncludes("this.exportRangeMode = 'manual'", 'export range mode state');
 expectIncludes("this.rangeBoundsTopicId = '';", 'range bounds topic tracking');
+expectIncludes("this.exportRangeBoundsTopicId = '';", 'export range bounds topic tracking');
 expectIncludes('this.rangeBoundsLastRefreshAt = 0', 'range bounds freshness tracking');
 expectIncludes("this.addManagedListener(input, 'input', () => this.markSummaryRangeManual());", 'manual summary range input tracking');
 expectIncludes("this.addManagedListener(input, 'input', () => this.markExportRangeManual());", 'manual export range input tracking');
@@ -96,10 +97,15 @@ expectIncludes('restoreOptimisticRange(scope, optimistic)', 'failed confirmation
 expectIncludes('waitForRangeConfirmation(scope)', 'summary/export waits for pending range confirmation');
 expectIncludes("if (!await this.waitForRangeConfirmation('summary')) return;", 'summary waits for range confirmation');
 expectIncludes("if (!await this.waitForRangeConfirmation('export')) return;", 'export waits for range confirmation');
-expectIncludes("const confirmation = this.getRangeUpperBound({\n                forceRefresh: true,\n                allowDomFallback: false,\n                allowRecentConfirmedCache: true", 'range buttons force exact upper bound with recent confirmed cache');
-expectIncludes("end = await this.getRangeUpperBound({ forceRefresh: true, allowDomFallback: false });", 'empty summary/export end forces exact upper bound');
-expectIncludes('if (requestSeq !== this.rangeRequestSeq || tid !== Core.getTopicId()) return;', 'summary stale range guard');
-expectIncludes('if (requestSeq !== this.exportRangeRequestSeq || tid !== Core.getTopicId()) return;', 'export stale range guard');
+expectIncludes("const confirmation = this.getRangeUpperBound({\n            scope: 'summary',\n            forceRefresh: true,\n            allowDomFallback: false,\n            allowRecentConfirmedCache: true", 'summary range button forces exact upper bound with recent confirmed cache');
+expectIncludes("const confirmation = this.getRangeUpperBound({\n            scope: 'export',\n            forceRefresh: true,\n            allowDomFallback: false,\n            allowRecentConfirmedCache: true", 'export range button forces exact upper bound with recent confirmed cache');
+expectIncludes("end = await this.getRangeUpperBound({ scope: 'summary', forceRefresh: true, allowDomFallback: false });", 'empty summary end forces exact upper bound');
+expectIncludes("end = await this.getRangeUpperBound({ scope: 'export', forceRefresh: true, allowDomFallback: false });", 'empty export end forces exact upper bound');
+expectIncludes('const isCurrentRequest = () => requestSeq === this.rangeRequestSeq', 'summary stale range sequence guard');
+expectIncludes('const isCurrentRequest = () => requestSeq === this.exportRangeRequestSeq', 'export stale range sequence guard');
+expectIncludes('lifecycleEpoch && !this.isCurrentLifecycleEpoch(lifecycleEpoch)', 'range lifecycle epoch guard');
+expectIncludes("['all', 'recent'].includes(this.rangeMode) && this.rangeBoundsTopicId !== tid", 'summary recalibrates automatic range after topic change');
+expectIncludes("['all', 'recent'].includes(this.exportRangeMode) && this.exportRangeBoundsTopicId !== tid", 'export recalibrates automatic range after topic change');
 expectIncludes("this.restoreOptimisticRange('summary', optimistic);", 'summary range failure restores optimistic values');
 expectIncludes("this.restoreOptimisticRange('export', optimistic);", 'export range failure restores optimistic values');
 
@@ -111,7 +117,8 @@ expectIncludes('activeTopicPrewarmTimer: null', 'active topic prewarm timer');
 expectIncludes('scheduleActiveTopicPrewarm', 'route and resume topic prewarm scheduler');
 expectIncludes('const topicId = Core.getTopicId();', 'route sync reads current topic id');
 expectIncludes('topicId && uiRuntime.activeTopicId && topicId !== uiRuntime.activeTopicId', 'same-page topic switch detection');
-expectIncludes('uiRuntime.activeUIManager.destroy();\n        uiRuntime.activeTopicId = topicId;\n        uiRuntime.activeUIManager = new UIManager();', 'topic switch rebuilds sidebar');
+expectIncludes('uiRuntime.activeUIManager.handleTopicRouteChange({ previousTopicId, topicId });', 'topic switch preserves the active workspace');
+expectIncludes('onTopicRouteChange()', 'shared UI route-change lifecycle');
 expectIncludes("scheduleActiveTopicPrewarm('route')", 'topic route creation schedules prewarm');
 expectIncludes("scheduleActiveTopicPrewarm('route-change')", 'topic switch schedules prewarm');
 expectIncludes("scheduleActiveTopicPrewarm('resume', Core.topicDataPrewarmPolicy.resumeDelayMs)", 'visible/focus resume schedules prewarm');

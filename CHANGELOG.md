@@ -1,5 +1,15 @@
 # Changelog
 
+## 7.8.0-alpha.4
+
+- Preserves the current summary and follow-up conversation when Linux.do navigates directly between topic routes without a full page reload, including browser back/forward navigation to the source topic.
+- Tracks the workspace source topic, shows a visible source notice on a different topic, and asks for confirmation before a new summary replaces a non-empty workspace from another topic.
+- Keeps an in-flight summary bound to the topic and floor range that started it even when SPA navigation changes the visible topic; stale callbacks cannot update a destroyed UI lifecycle.
+- Invalidates topic-bound floor metadata on route changes and recalculates `all` or `recent` summary/export ranges before using them on the destination topic.
+- Retains normal teardown when navigation leaves topic pages, without adding storage migrations, provider schema changes, or background Linux.do requests.
+- Adds behavior-level route, replacement-confirmation, request-ownership, stale-range, accessibility, build, and release-route regression coverage.
+- Adds this explicitly approved lifecycle-fix exception to `7.8.0-alpha.1 -> 7.8.0-alpha.2 -> 7.8.0-alpha.3 -> 7.8.0-alpha.4 -> 7.8.0-beta.1 -> 7.8.0`; beta remains compatibility/defect-only.
+
 ## 7.8.0-alpha.3
 
 - Extends the shared `Explain`, `Simplify`, and `Quote to chat` selection toolbar to final-answer text in completed assistant replies while rejecting user messages, active or incomplete replies, reasoning, status text, source metadata, and cross-message selections.

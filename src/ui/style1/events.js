@@ -328,9 +328,36 @@ export const style1Events = {
         Q('#btn-refresh-models').onclick = () => this.loadModelList();
         Q('#btn-close-model-picker').onclick = () => this.closeModelPicker();
         Q('#btn-cancel-model-picker').onclick = () => this.closeModelPicker();
+        Q('#btn-confirm-workspace-replace').onclick = () => this.closeWorkspaceReplacementConfirm(true);
+        Q('#btn-cancel-workspace-replace').onclick = () => this.closeWorkspaceReplacementConfirm(false);
+        Q('#btn-close-workspace-replace').onclick = () => this.closeWorkspaceReplacementConfirm(false);
 
         this.addManagedListener(Q('#model-picker-modal'), 'click', (e) => {
             if (e.target?.id === 'model-picker-modal') this.closeModelPicker();
+        });
+        this.addManagedListener(Q('#workspace-replace-modal'), 'click', (e) => {
+            if (e.target?.id === 'workspace-replace-modal') this.closeWorkspaceReplacementConfirm(false);
+        });
+        this.addManagedListener(Q('#workspace-replace-modal'), 'keydown', (e) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                this.closeWorkspaceReplacementConfirm(false);
+                return;
+            }
+            if (e.key !== 'Tab') return;
+            const modal = Q('#workspace-replace-modal');
+            const controls = [...modal.querySelectorAll('button:not([disabled])')];
+            if (controls.length === 0) return;
+            const first = controls[0];
+            const last = controls[controls.length - 1];
+            const activeElement = modal.getRootNode().activeElement;
+            if (e.shiftKey && (activeElement === first || !modal.contains(activeElement))) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
         });
 
         this.addManagedListener(Q('#model-picker-list'), 'click', (e) => {

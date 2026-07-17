@@ -29,9 +29,9 @@ const syncTopicPageUi = () => {
             uiRuntime.activeUIManager = new UIManager();
             scheduleActiveTopicPrewarm('route');
         } else if (topicId && uiRuntime.activeTopicId && topicId !== uiRuntime.activeTopicId) {
-            uiRuntime.activeUIManager.destroy();
+            const previousTopicId = uiRuntime.activeTopicId;
             uiRuntime.activeTopicId = topicId;
-            uiRuntime.activeUIManager = new UIManager();
+            uiRuntime.activeUIManager.handleTopicRouteChange({ previousTopicId, topicId });
             scheduleActiveTopicPrewarm('route-change');
         }
         return;

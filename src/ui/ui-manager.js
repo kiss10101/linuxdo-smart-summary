@@ -62,6 +62,12 @@ export class UIManager {
         this.host = null;
     }
 
+    handleTopicRouteChange(change) {
+        if (this.currentUI && typeof this.currentUI.onTopicRouteChange === 'function') {
+            this.currentUI.onTopicRouteChange(change);
+        }
+    }
+
     registerMenuCommands() {
         if (UIManager.menuCommandsRegistered) return;
         const styles = UIRegistry.getAllNames();
@@ -73,6 +79,7 @@ export class UIManager {
                         window.alert?.('请在 Linux.do 主题页使用智能总结。');
                         return;
                     }
+                    uiRuntime.activeTopicId = Core.getTopicId();
                     uiRuntime.activeUIManager = new UIManager();
                 }
                 uiRuntime.activeUIManager.loadUI(styleName);

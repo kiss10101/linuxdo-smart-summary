@@ -201,6 +201,7 @@ export const STYLE2_STYLES = `
     .btn-xs:hover { color: var(--ui-accent); background: var(--ui-accent-soft); border-color: var(--ui-accent); }
     .btn-xs:disabled, .btn-xs.loading { opacity: 0.55; cursor: wait; }
 
+    .workspace-source-status { margin-top: 10px; padding: 9px 11px; color: var(--ui-text-secondary); background: var(--ui-surface-muted); border: 1px solid var(--ui-border); border-radius: var(--radius-md); font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
     .summary-result-wrapper { position: relative; }
     .result-box { position: relative; width: 100%; min-height: 150px; max-height: calc(100vh - 350px); margin-top: 16px; padding: 18px 18px 18px 22px; overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable; color: var(--ui-text); background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: var(--radius-lg); box-shadow: none; font-size: 14px; line-height: 1.72; overflow-wrap: anywhere; direction: rtl; text-align: start; }
     .result-box > * { direction: ltr; unicode-bidi: isolate; }
@@ -342,17 +343,19 @@ export const STYLE2_STYLES = `
     .model-input-row input { min-width: 0; flex: 1; }
     .model-fetch-btn { height: 42px; flex: 0 0 auto; padding: 0 11px; }
 
-    .model-picker-overlay { position: absolute; inset: 0; z-index: 10002; display: none; align-items: center; justify-content: center; padding: 20px; background: var(--ui-overlay); }
-    .model-picker-overlay.show { display: flex; }
-    .model-picker-dialog { width: 100%; max-width: 360px; max-height: 72vh; display: flex; flex-direction: column; overflow: hidden; background: var(--ui-surface-raised); border: 1px solid var(--ui-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-menu); }
-    .model-picker-header { min-height: 54px; padding: 8px 9px 8px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--ui-border); }
-    .model-picker-title { color: var(--ui-text); font-size: 14px; font-weight: 680; }
+    .model-picker-overlay, .workspace-replace-overlay { position: absolute; inset: 0; z-index: 10002; display: none; align-items: center; justify-content: center; padding: 20px; background: var(--ui-overlay); }
+    .model-picker-overlay.show, .workspace-replace-overlay.show { display: flex; }
+    .model-picker-dialog, .workspace-replace-dialog { width: 100%; max-width: 360px; max-height: 72vh; display: flex; flex-direction: column; overflow: hidden; background: var(--ui-surface-raised); border: 1px solid var(--ui-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-menu); }
+    .model-picker-header, .workspace-replace-header { min-height: 54px; padding: 8px 9px 8px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--ui-border); }
+    .model-picker-title, .workspace-replace-title { color: var(--ui-text); font-size: 14px; font-weight: 680; }
     .model-picker-status { padding: 10px 16px; color: var(--ui-text-secondary); border-bottom: 1px solid var(--ui-border); font-size: 12px; line-height: 1.5; }
     .model-picker-status.error { color: var(--ui-danger); }
     .model-picker-list { min-height: 120px; flex: 1; padding: 7px; overflow-y: auto; }
     .model-option { width: 100%; min-height: 40px; padding: 9px 10px; color: var(--ui-text); background: transparent; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; text-align: left; overflow-wrap: anywhere; transition: color var(--transition-fast), background-color var(--transition-fast); }
     .model-option:hover, .model-option:focus-visible { color: var(--ui-accent); background: var(--ui-accent-soft); }
-    .model-picker-actions { padding: 11px 16px 14px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--ui-border); }
+    .model-picker-actions, .workspace-replace-actions { padding: 11px 16px 14px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--ui-border); }
+    .workspace-replace-message { padding: 17px 16px; color: var(--ui-text-secondary); font-size: 13px; line-height: 1.65; overflow-wrap: anywhere; }
+    #btn-confirm-workspace-replace { color: var(--text-inverse); background: var(--ui-accent); border-color: var(--ui-accent); }
 
     .toggle-switch { position: relative; width: 44px; height: 26px; flex: 0 0 auto; }
     .toggle-switch input { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; opacity: 0; clip: rect(0 0 0 0); }
