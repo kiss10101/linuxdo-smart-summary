@@ -47,6 +47,7 @@ UIRegistry.register('style2', {
         this.editingDraftBefore = '';
         this.currentMessageMenuId = null;
         this.currentMessageMenuReturnFocus = null;
+        this.currentContentSelection = null;
         this.currentSummarySelection = null;
         this.currentSummarySelectionReturnFocus = null;
         this.summarySelectionOpenTimerId = null;
@@ -331,6 +332,10 @@ UIRegistry.register('style2', {
                                  <div class="setting-info"><label class="setting-label">自动滚动</label><div class="setting-desc">生成内容时自动滚动到最新位置</div></div>
                                  <label class="toggle-switch"><input type="checkbox" id="cfg-autoscroll" aria-label="自动滚动" checked><span class="toggle-slider"></span></label>
                              </div>
+                             <div class="setting-item setting-item-row floating-opacity-setting">
+                                 <div class="setting-info"><label class="setting-label" for="cfg-floating-menu-opacity">悬浮菜单不透明度</label><div class="setting-desc" id="cfg-floating-menu-opacity-desc">仅影响选中文本和消息操作菜单；数值越低越透明</div></div>
+                                 <div class="range-setting-control"><input type="range" id="cfg-floating-menu-opacity" min="80" max="100" step="1" value="88" aria-describedby="cfg-floating-menu-opacity-desc"><output id="cfg-floating-menu-opacity-output" for="cfg-floating-menu-opacity">88%</output></div>
+                             </div>
                          </div>
                          <button type="button" class="btn" id="btn-save">${this.ICONS.check} 保存设置</button>
                     </div>
@@ -379,6 +384,8 @@ UIRegistry.register('style2', {
     syncCurrentApiFormToActiveProfile: UIRegistry.get('style1').syncCurrentApiFormToActiveProfile,
     renderApiProfileList: UIRegistry.get('style1').renderApiProfileList,
     renderApiProfileSelect: UIRegistry.get('style1').renderApiProfileSelect,
+    normalizeFloatingMenuOpacity: UIRegistry.get('style1').normalizeFloatingMenuOpacity,
+    applyFloatingMenuOpacity: UIRegistry.get('style1').applyFloatingMenuOpacity,
     fillApiFormFromProfile: UIRegistry.get('style1').fillApiFormFromProfile,
     refreshApiProfileSummary: UIRegistry.get('style1').refreshApiProfileSummary,
     updateApiProfileActionState: UIRegistry.get('style1').updateApiProfileActionState,
@@ -415,7 +422,11 @@ UIRegistry.register('style2', {
         Q('#export-recent-count').textContent = recentFloors;
         Q('#cfg-stream').checked = GM_getValue('useStream', true);
         Q('#cfg-autoscroll').checked = GM_getValue('autoScroll', true);
-        this.syncTabAccessibility(this.currentTab);
+        this.applyFloatingMenuOpacity(GM_getValue(
+            CONFIG.floatingMenuOpacityKey,
+            CONFIG.floatingMenuOpacityDefault
+        ));
+        this.switchTab(this.currentTab || 'summary');
         this.syncSidebarAccessibility();
         this.applyResponsiveLayout();
     },
@@ -589,6 +600,7 @@ UIRegistry.register('style2', {
     syncChatPromptMemory: UIRegistry.get('style1').syncChatPromptMemory,
     applyRecentFloorsStorageSnapshot: UIRegistry.get('style1').applyRecentFloorsStorageSnapshot,
     applyStreamAndAutoscrollStorageSnapshot: UIRegistry.get('style1').applyStreamAndAutoscrollStorageSnapshot,
+    applyFloatingMenuOpacityStorageSnapshot: UIRegistry.get('style1').applyFloatingMenuOpacityStorageSnapshot,
     getAssistantForUser: UIRegistry.get('style1').getAssistantForUser,
     getUserForAssistant: UIRegistry.get('style1').getUserForAssistant,
     removeVisibleMessagesAfter: UIRegistry.get('style1').removeVisibleMessagesAfter,
@@ -604,7 +616,10 @@ UIRegistry.register('style2', {
     bindSummarySelectionMenu: UIRegistry.get('style1').bindSummarySelectionMenu,
     getCurrentSelection: UIRegistry.get('style1').getCurrentSelection,
     clearCurrentSelection: UIRegistry.get('style1').clearCurrentSelection,
+    getContentSelectionState: UIRegistry.get('style1').getContentSelectionState,
     getSummarySelectionState: UIRegistry.get('style1').getSummarySelectionState,
+    getTrustedDirectAnswer: UIRegistry.get('style1').getTrustedDirectAnswer,
+    resolveContentSelectionSource: UIRegistry.get('style1').resolveContentSelectionSource,
     isSummarySelectionRangeAllowed: UIRegistry.get('style1').isSummarySelectionRangeAllowed,
     getSelectionAnchorRect: UIRegistry.get('style1').getSelectionAnchorRect,
     openSummarySelectionMenu: UIRegistry.get('style1').openSummarySelectionMenu,

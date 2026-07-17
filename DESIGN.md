@@ -6,8 +6,8 @@
 - Continue shipping one directly installable Tampermonkey userscript.
 - Make the published file reproducible from committed source and a locked toolchain.
 - Preserve the verified Linux.do request policy and existing runtime behavior.
-- Keep the architecture migration route bounded to one source gate, one feature/UI gate,
-  one compatibility gate, and stable promotion.
+- Keep the architecture migration route bounded to one source gate, two explicitly approved
+  feature/UI gates, one compatibility gate, and stable promotion.
 
 ## Source And Artifact Boundary
 
@@ -58,10 +58,16 @@ does not leave a hidden request or a temporary lockout. Provider model order is 
 
 ## Interaction State Contracts
 
-Selected-summary actions and chat-message actions are shared behavior contracts rather than
-theme-specific policy. The summary toolbar exposes explain, simplify, and quote-to-chat.
-Explain and simplify may send only when no AI request or user draft would be displaced;
-quote-to-chat always appends a block quote to the draft and never sends automatically.
+Selected-answer actions and chat-message actions are shared behavior contracts rather than
+theme-specific policy. One toolbar exposes explain, simplify, and quote-to-chat for selected
+final-answer text in the summary and in completed assistant replies. The renderer wraps final
+answer Markdown in an explicit `.ai-output-answer` allowlist boundary; reasoning, incomplete or
+failure status, request source metadata, controls, user messages, active replies, and selections
+that cross messages cannot enter the selected-answer path. Explain and simplify may send only
+when no AI request or user draft would be displaced; quote-to-chat always appends a block quote
+to the draft and never sends automatically. Selection text remains capped at 2,000 characters,
+and source-specific prompts treat the selected model output as quoted data rather than
+instructions.
 
 Message actions are derived from message role, message status, active request identity, and
 copyable answer content. During generation, only the active assistant reply can stop,
@@ -83,6 +89,21 @@ and a narrow-screen overlay fallback. It retains the attached desktop panel and 
 and settings information architecture. Style1 keeps its established visual treatment as the
 compatibility theme while consuming the same selection, message-action, request-lifecycle,
 keyboard, and menu-positioning behavior.
+
+The global Tampermonkey key `floatingMenuOpacity` controls only selected-answer and message-
+action menu backgrounds in both themes. It is an integer percentage from `80` through `100`,
+defaults to `88`, and normalizes missing, non-numeric, or out-of-range values before exposing a
+CSS surface token. It does not change the opacity of dialogs, toasts, tooltips, the message-menu
+trigger, jump controls, or the sidebar. Transparency is applied to the surface color rather than
+the entire element so text, danger state, focus rings, and borders retain their contrast;
+unsupported blur, reduced-transparency, and forced-colors modes receive opaque fallbacks.
+
+Summary and chat reading areas place their native vertical scrollbars on the left through local
+RTL scroll shells. An immediate LTR, bidi-isolated content layer restores normal text, code,
+table, selection, and horizontal-scroll behavior; reasoning uses the explicit
+`.thinking-content > .thinking-content-inner > .thinking-scroll-content` boundary for the same
+separation. RTL must not be applied to the sidebar, input controls, or code blocks, and no
+transformed or JavaScript-simulated scrollbar is permitted.
 
 Interactive tabs, menu triggers, menu items, and toolbar actions use native button semantics
 with explicit ARIA state and keyboard navigation. At narrow viewport widths the panel stops
@@ -129,31 +150,42 @@ Linux.do page. Dependency URLs therefore remain version- and integrity-pinned, w
 read-only default permissions, fixtures are synthetic, and no API keys or session material are
 accepted in the repository.
 
+## Reference Design Boundary
+
+The interaction hierarchy and restrained floating-surface principles were independently
+informed by Cerebr. Cerebr is GPLv3 while this project is MIT, so its CSS, HTML, SVG data,
+component implementation, and substantial source fragments must not be copied. Only general
+interaction concepts, information hierarchy, and independently chosen measurements may be
+used; runtime code and visual assets remain original to this repository.
+
 ## Transitional Limits
 
 The first modular release intentionally preserved behavior and accepted several larger
-presentation or orchestration modules behind composition roots. Alpha.2 may split Style2
-presentation concerns where that directly supports the approved UI work, but it does not
-introduce a theme framework or reserve extension points for hypothetical future styles.
-Further unrelated decomposition remains maintenance work, not another release stage.
+presentation or orchestration modules behind composition roots. Alpha.2 split presentation
+concerns only where required by its approved UI work; alpha.3 reuses the existing shared
+selection, menu, and settings boundaries rather than introducing another theme framework or
+selection plugin system. Further unrelated decomposition remains maintenance work, not another
+release stage.
 
 ## Short Release Route
 
 ```text
-7.8.0-alpha.1 -> 7.8.0-alpha.2 -> 7.8.0-beta.1 -> 7.8.0
+7.8.0-alpha.1 -> 7.8.0-alpha.2 -> 7.8.0-alpha.3 -> 7.8.0-beta.1 -> 7.8.0
 ```
 
 - `alpha.1`: validates source/build equivalence, module boundaries, and maintainer workflow.
 - `alpha.2`: one-time selected-text, message-lifecycle, accessibility, responsive, and default
   UI feature gate.
+- `alpha.3`: user-approved final feature gate for completed-reply selection, configurable
+  floating-menu opacity, compact message actions, and consistent left-side reading scrollbars.
 - `beta.1`: reserved for real-user compatibility fixes found in alpha; no new features.
 - `7.8.0`: stable promotion after beta acceptance; no architecture expansion.
 
-There are no planned `alpha.3` or release-candidate stages. Alpha.2 is the single exception
-added after alpha.1 to carry the approved user-facing interaction and default-UI work. A
-critical defect can still justify an exceptional patch, but the planned route remains exactly
-these four gates. The route is stored in `tools/release-manifest.json` and enforced by release
-verification.
+Alpha.3 is the last planned feature gate and was added only after explicit user approval of
+the completed-reply and floating-menu scope. There are no planned further alpha or release-
+candidate stages. Beta.1 remains limited to real-user compatibility and defect closure; new
+features must not be moved into beta. The five-gate route is stored in
+`tools/release-manifest.json` and enforced by release verification.
 
 ## GitHub Automation
 
@@ -181,6 +213,24 @@ Recommended repository settings are:
 
 ## Change History
 
+### 2026-07-17 - Final user-approved feature gate
+
+**Change**: Added alpha.3 for answer-only selection in completed assistant replies, adjustable
+floating-menu opacity, compact message actions, and consistent left-side summary/chat reading
+scrollbars.
+
+**Reason**: Users need the same explain, simplify, and quote workflow while reading completed
+AI replies, plus denser menus and an explicit display preference, before compatibility-only beta
+testing begins.
+
+**Impact**: Shared selection containment, final-answer rendering boundaries, floating-menu
+tokens, one global display setting, reading scroll shells, tests, release metadata, and the
+generated preview asset. Provider profiles, AI request schemas, Linux.do request policy, and
+stable `7.6.1` remain unchanged.
+
+**Decision**: Treat alpha.3 as the user-approved final feature gate. Beta.1 may close only
+compatibility and defect findings, followed by stable `7.8.0` promotion.
+
 ### 2026-07-16 - Interaction and default UI gate
 
 **Change**: Added a one-time alpha.2 gate for selected-summary action consolidation,
@@ -196,8 +246,9 @@ accessibility and responsive behavior, tests, release metadata, and generated pr
 Stored settings, provider profiles, Linux.do request policy, public runtime APIs, and Style1's
 visual identity remain compatible.
 
-**Decision**: Treat alpha.2 as the final planned feature/UI gate. Keep beta.1 limited to
-compatibility and defect closure, then promote the verified result to 7.8.0.
+**Decision**: Alpha.2 was the planned feature/UI gate at the time; the later alpha.3 exception
+was approved explicitly for the bounded reply-selection, menu, and scrollbar scope. Beta.1
+remains limited to compatibility and defect closure.
 
 ### 2026-07-15 - Modular source migration
 
@@ -212,4 +263,4 @@ documentation, and the generated preview artifact. Linux.do request policy is un
 
 **Decision**: Preserve runtime method contracts through explicit composition roots and keep
 the toolchain to Node plus exact esbuild. The original three-stage route was later amended by
-the recorded alpha.2 interaction/UI decision above.
+the recorded alpha.2 and final alpha.3 interaction/UI decisions above.

@@ -5,6 +5,11 @@ export const CONFIG = {
     activeApiProfileIdKey: 'activeApiProfileId',
     defaultApiUrl: 'https://api.deepseek.com/v1/chat/completions',
     defaultModel: 'deepseek-chat',
+    floatingMenuOpacityKey: 'floatingMenuOpacity',
+    floatingMenuOpacityDefault: 88,
+    floatingMenuOpacityMin: 80,
+    floatingMenuOpacityMax: 100,
+    floatingMenuOpacityStep: 1,
     configSyncDebounceMs: 50,
     configSyncDirtyRetryMs: 300,
     configSyncKeys: [
@@ -17,6 +22,7 @@ export const CONFIG = {
         'prompt_chat',
         'recentFloors',
         'useStream',
-        'autoScroll'
+        'autoScroll',
+        'floatingMenuOpacity'
     ],
 };

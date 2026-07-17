@@ -32,6 +32,8 @@ test('Style2 renders semantic tabs, sidebar controls, and accessible touch targe
   assert.equal((style2Source.match(/<button[^>]+role="tab"/g) || []).length, 4);
   assert.equal((style2Source.match(/<div[^>]+role="tabpanel"/g) || []).length, 4);
   assert.match(style2Source, /syncTabAccessibility\(tabName\)/);
+  assert.match(style2Source, /restoreState\(\)[\s\S]*this\.switchTab\(this\.currentTab \|\| 'summary'\);/);
+  assert.doesNotMatch(style2Source, /restoreState\(\)[\s\S]*this\.syncTabAccessibility\(this\.currentTab\);/);
   assert.match(style2Source, /\['ArrowLeft', 'ArrowRight', 'Home', 'End'\]/);
   assert.match(presentationSource, /\.message-menu-item\s*\{[^}]*min-height:\s*40px/);
   assert.match(presentationSource, /\.summary-selection-item\s*\{[^}]*min-height:\s*40px/);

@@ -144,7 +144,9 @@ assertContains(distText, 'this.bindSettingsStorageSync();', 'settings sync rebou
 assertContains(distText, '.content-area.chat-active { overflow: hidden; }', 'chat disables outer content scrolling');
 assertContains(distText, '#page-chat.view-page.active { display: flex; height: 100%; min-height: 0;', 'chat page owns available height');
 assertContains(distText, '.chat-messages-wrapper { flex: 1; min-height: 0;', 'chat message wrapper can shrink');
-assertContains(distText, '.chat-messages { height: 100%; min-height: 0; overflow-y: auto;', 'chat messages own vertical scrolling');
+if (!/\.chat-messages\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*0;[^}]*overflow-y:\s*auto;/s.test(distText)) {
+  throw new Error('chat messages own vertical scrolling: expected height, min-height, and overflow-y in the same rule');
+}
 assertContains(distText, "contentArea.classList.toggle('chat-active', tabName === 'chat');", 'tab switch assigns chat scroll ownership');
 assertContains(distText, '.scroll-buttons { position: absolute; right: 10px;', 'floating scroll controls remain separate on right');
 assertForbidden(syncBlock, [

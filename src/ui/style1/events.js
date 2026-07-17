@@ -222,6 +222,7 @@ export const style1Events = {
             chatScrollFrameId = this.requestManagedFrame(() => {
                 chatScrollFrameId = null;
                 this.closeMessageContextMenu();
+                this.closeSummarySelectionMenu?.();
                 const currentScrollTop = chatMessages.scrollTop;
                 const isNearBottom = (chatMessages.scrollHeight - currentScrollTop - chatMessages.clientHeight) < 80;
                 if (this.isGenerating && !this.isProgrammaticScroll) {
@@ -239,6 +240,7 @@ export const style1Events = {
             if (summaryScrollFrameId) return;
             summaryScrollFrameId = this.requestManagedFrame(() => {
                 summaryScrollFrameId = null;
+                this.closeSummarySelectionMenu?.();
                 const currentScrollTop = summaryResult.scrollTop;
                 const isNearBottom = this.isNearScrollBottom(summaryResult, 80);
                 if (this.isGenerating && !this.isSummaryProgrammaticScroll) {
@@ -290,6 +292,13 @@ export const style1Events = {
             const input = Q(selector);
             if (input) this.addManagedListener(input, 'change', () => this.markSettingsDirty(key));
         });
+        const floatingMenuOpacityInput = Q('#cfg-floating-menu-opacity');
+        if (floatingMenuOpacityInput) {
+            this.addManagedListener(floatingMenuOpacityInput, 'input', () => {
+                this.applyFloatingMenuOpacity(floatingMenuOpacityInput.value);
+                this.markSettingsDirty(CONFIG.floatingMenuOpacityKey);
+            });
+        }
         Q('#btn-api-profile-add').onclick = () => this.addApiProfile();
         Q('#btn-api-profile-copy').onclick = () => this.copyApiProfile();
         Q('#btn-api-profile-delete').onclick = () => this.deleteApiProfile();
@@ -306,6 +315,10 @@ export const style1Events = {
             Q('#export-recent-count').textContent = recentFloors;
             GM_setValue('useStream', Q('#cfg-stream').checked);
             GM_setValue('autoScroll', Q('#cfg-autoscroll').checked);
+            const floatingMenuOpacity = this.applyFloatingMenuOpacity(
+                Q('#cfg-floating-menu-opacity')?.value
+            );
+            GM_setValue(CONFIG.floatingMenuOpacityKey, floatingMenuOpacity);
             this.clearSettingsDirty(CONFIG.configSyncKeys);
             this.showToast('设置已保存', 'success');
             this.switchTab('summary');
@@ -550,6 +563,9 @@ export const style1Events = {
             if (keys.has('useStream') || keys.has('autoScroll')) {
                 this.applyStreamAndAutoscrollStorageSnapshot();
             }
+            if (keys.has(CONFIG.floatingMenuOpacityKey)) {
+                this.applyFloatingMenuOpacityStorageSnapshot();
+            }
         } finally {
             this.applyingRemoteSettingsSnapshot = false;
             this.remoteSettingsConflictNotified = false;
@@ -613,6 +629,13 @@ export const style1Events = {
         const autoscrollInput = Q('#cfg-autoscroll');
         if (streamInput) streamInput.checked = GM_getValue('useStream', true);
         if (autoscrollInput) autoscrollInput.checked = GM_getValue('autoScroll', true);
+    },
+
+    applyFloatingMenuOpacityStorageSnapshot() {
+        this.applyFloatingMenuOpacity(GM_getValue(
+            CONFIG.floatingMenuOpacityKey,
+            CONFIG.floatingMenuOpacityDefault
+        ));
     },
 
     handleApiProfileSelect(nextId) {

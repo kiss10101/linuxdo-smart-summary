@@ -38,6 +38,7 @@ for (const testCase of fixture.promptCases || []) {
   if ('expectedAction' in testCase) assertEqual(promptSpec.action, testCase.expectedAction, `${testCase.name}: action`);
   if ('expectedAutoSend' in testCase) assertEqual(promptSpec.autoSend, testCase.expectedAutoSend, `${testCase.name}: autoSend`);
   if ('expectedPrompt' in testCase) assertEqual(promptSpec.prompt, testCase.expectedPrompt, `${testCase.name}: exact prompt`);
+  if ('expectedReason' in testCase) assertEqual(promptSpec.reason, testCase.expectedReason, `${testCase.name}: reason`);
   for (const fragment of testCase.expectedContains || []) {
     assertContains(promptSpec.prompt, fragment, `${testCase.name}: prompt`);
   }
@@ -54,9 +55,9 @@ for (const legacyAction of ['data-summary-selection-action="ask"', 'data-summary
   if (selectionMenuMatch[1].includes(legacyAction)) throw new Error(`selection toolbar still exposes legacy action ${legacyAction}`);
 }
 const actionIndices = [
-  'data-summary-selection-action="explain">解释',
-  'data-summary-selection-action="simplify">精简',
-  'data-summary-selection-action="quote">引用到对话'
+  'data-summary-selection-action="explain"',
+  'data-summary-selection-action="simplify"',
+  'data-summary-selection-action="quote"'
 ].map(fragment => selectionMenuMatch[1].indexOf(fragment));
 if (actionIndices.some(index => index < 0) || actionIndices.some((index, position) => position > 0 && index <= actionIndices[position - 1])) {
   throw new Error(`selection toolbar action order mismatch: ${JSON.stringify(actionIndices)}`);
@@ -70,14 +71,14 @@ for (const pattern of fixture.distShape?.requiredRegex || []) {
   if (!regex.test(sourceText)) throw new Error(`source regex missing: ${pattern}`);
 }
 
-const summaryStateMatch = sourceText.match(/getSummarySelectionState\(\)\s*\{([\s\S]*?)\n\s*}\s*,\n\s*isSummarySelectionRangeAllowed/);
-if (!summaryStateMatch) throw new Error('source shape: getSummarySelectionState block not found');
-if (summaryStateMatch[1].includes('this.isGenerating')) {
-  throw new Error('source shape: getSummarySelectionState should not hide the selected-summary menu while chat/export is generating');
+const contentSelectionStateMatch = sourceText.match(/getContentSelectionState\(\)\s*\{([\s\S]*?)\n\s*}\s*,\n\s*getSummarySelectionState/);
+if (!contentSelectionStateMatch) throw new Error('source shape: getContentSelectionState block not found');
+if (contentSelectionStateMatch[1].includes('this.isGenerating')) {
+  throw new Error('source shape: getContentSelectionState should not hide the shared selection menu while chat/export is generating');
 }
 
-const usefulMatch = sourceText.match(/isSummarySelectionTextUseful\([^)]*\)\s*\{([\s\S]*?)\n\s*}\s*,\n\s*buildSummarySelectionPrompt/);
-if (!usefulMatch) throw new Error('source shape: isSummarySelectionTextUseful block not found');
+const usefulMatch = sourceText.match(/isSelectionTextUseful\([^)]*\)\s*\{([\s\S]*?)\n\s*}\s*,\n\s*normalizeSelectionSourceKind/);
+if (!usefulMatch) throw new Error('source shape: isSelectionTextUseful block not found');
 if (/>=\s*(4|8|10)\b/.test(usefulMatch[1])) {
   throw new Error('source shape: selected-summary usefulness should not enforce a minimum selected character count');
 }

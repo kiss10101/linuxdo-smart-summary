@@ -90,19 +90,21 @@
       "expectedPrompt": "> 第一行\n> 第二行\n\n"
     },
     {
-      "name": "unknown action falls back to quote",
+      "name": "unknown action is rejected",
       "action": "unknown",
-      "text": "未知动作应走引用",
-      "expectedAction": "quote",
+      "text": "未知动作不能自动降级",
+      "expectedAction": "unknown",
       "expectedAutoSend": false,
-      "expectedContains": ["> 未知动作应走引用"]
+      "expectedPrompt": "",
+      "expectedReason": "unsupported_action"
     }
   ],
   "distShape": {
     "requiredContains": [
       "getSummarySelectionMenuHtml",
       "bindSummarySelectionMenu",
-      "getSummarySelectionState",
+      "getContentSelectionState",
+      "resolveContentSelectionSource",
       "handleSummarySelectionAction",
       "fillChatInputWithSelectionPrompt",
       "summarySelectionOpenTimerId",
@@ -120,11 +122,11 @@
       "clearCurrentSelection: UIRegistry.get('style1').clearCurrentSelection"
     ],
     "requiredRegex": [
-      "shadow\\?\\.getSelection\\?\\.\\(\\) \\|\\| window\\.getSelection\\?\\.\\(\\)",
+      "window\\.getSelection\\?\\.\\(\\)",
       "requestSeq !== this\\.summarySelectionRequestSeq",
       "this\\.switchTab\\('chat'\\)",
       "if \\(isStreaming\\) this\\.closeSummarySelectionMenu\\?\\.\\(\\)",
-      "Core\\.buildSummarySelectionPrompt\\(action, selection\\.text\\)"
+      "Core\\.buildSelectionPrompt \\|\\| Core\\.buildSummarySelectionPrompt"
     ]
   }
 }

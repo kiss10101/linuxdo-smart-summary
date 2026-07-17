@@ -23,7 +23,33 @@ export const style1State = {
         Q('#export-recent-count').textContent = recentFloors;
         Q('#cfg-stream').checked = GM_getValue('useStream', true);
         Q('#cfg-autoscroll').checked = GM_getValue('autoScroll', true);
+        this.applyFloatingMenuOpacity(GM_getValue(
+            CONFIG.floatingMenuOpacityKey,
+            CONFIG.floatingMenuOpacityDefault
+        ));
         this.switchTab(this.currentTab || 'summary');
+    },
+
+    normalizeFloatingMenuOpacity(value) {
+        const numericValue = Number(value);
+        if (!Number.isFinite(numericValue)) return CONFIG.floatingMenuOpacityDefault;
+        return Math.max(
+            CONFIG.floatingMenuOpacityMin,
+            Math.min(CONFIG.floatingMenuOpacityMax, Math.round(numericValue))
+        );
+    },
+
+    applyFloatingMenuOpacity(value) {
+        const opacity = this.normalizeFloatingMenuOpacity(value);
+        this.uiManager.host.style.setProperty('--floating-menu-opacity', `${opacity}%`);
+        const input = this.uiManager.Q('#cfg-floating-menu-opacity');
+        const output = this.uiManager.Q('#cfg-floating-menu-opacity-output');
+        if (input) {
+            input.value = `${opacity}`;
+            input.setAttribute('aria-valuetext', `${opacity}%`);
+        }
+        if (output) output.textContent = `${opacity}%`;
+        return opacity;
     },
 
     applySideState() {
@@ -118,6 +144,7 @@ export const style1State = {
             panel.setAttribute('aria-hidden', `${!active}`);
         });
         contentArea.classList.toggle('chat-active', tabName === 'chat');
+        contentArea.classList.toggle('summary-active', tabName === 'summary');
         this.currentTab = tabName;
         if (tabName === 'chat') this.setManagedTimeout(() => this.updateScrollButtons(), 100);
         if (tabName === 'summary') this.setManagedTimeout(() => this.updateSummaryScrollButton(), 100);

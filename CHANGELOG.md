@@ -1,5 +1,15 @@
 # Changelog
 
+## 7.8.0-alpha.3
+
+- Extends the shared `Explain`, `Simplify`, and `Quote to chat` selection toolbar to final-answer text in completed assistant replies while rejecting user messages, active or incomplete replies, reasoning, status text, source metadata, and cross-message selections.
+- Wraps final answer Markdown in an explicit selectable allowlist so provider-returned reasoning remains isolated from selection actions, copied answers, and later model context.
+- Adds a global `floatingMenuOpacity` display setting for the selected-answer and message-action menus, normalized to `80%`–`100%` with an accessible `88%` default and opaque compatibility fallbacks.
+- Compacts the message action menu around its text labels while preserving keyboard navigation, 40px touch targets, danger styling, focus restoration, and viewport-edge clamping.
+- Places summary and chat reading scrollbars consistently on the left through local RTL scroll shells while restoring LTR, bidi-isolated answer content, code, tables, and horizontal scrolling.
+- Extends selection-containment, configuration-sync, menu-geometry, accessibility, scrollbar-direction, build, and release-route coverage for the new contracts.
+- Adds this explicitly user-approved final feature gate to `7.8.0-alpha.1 -> 7.8.0-alpha.2 -> 7.8.0-alpha.3 -> 7.8.0-beta.1 -> 7.8.0`; beta remains compatibility/defect-only.
+
 ## 7.8.0-alpha.2
 
 - Consolidates selected-summary actions into `Explain`, `Simplify`, and `Quote to chat`; quoting preserves the current draft and never sends automatically.
@@ -8,7 +18,7 @@
 - Keeps partial output visible after a user stop, marks it incomplete, and continues excluding service-returned reasoning from copied answers and later model context.
 - Redesigns the default Style2 with independently implemented warm-neutral and steel-blue tokens, restrained surfaces, keyboard-accessible controls, reduced-motion handling, and a narrow-screen overlay fallback; Style1 remains the compatibility theme.
 - Adds focused selection-action, message-state, abort-race, accessibility, responsive-layout, and release-route regression coverage.
-- Inserts this release as the one-time feature and default-UI gate in `7.8.0-alpha.1 -> 7.8.0-alpha.2 -> 7.8.0-beta.1 -> 7.8.0`; beta remains compatibility-only.
+- Establishes the default-UI gate later followed by the explicitly approved final `alpha.3` feature gate; beta remains compatibility-only.
 
 ## 7.8.0-alpha.1
 
@@ -17,7 +27,7 @@
 - Moves legacy regression checks from bundle formatting assumptions to source behavior and module contracts.
 - Makes model-list requests cancellable, enforces a 15-second timeout, and restores both model-fetch buttons after success, failure, timeout, modal close, or UI teardown.
 - Escapes provider and topic-derived status text and normalizes export filenames before inserting them into UI or download paths.
-- Establishes the modular migration baseline later followed by the one-time `alpha.2` interaction/UI gate, compatibility-only `beta.1`, and stable `7.8.0` promotion.
+- Establishes the modular migration baseline later followed by the `alpha.2` interaction/UI gate, the explicitly approved final `alpha.3` feature gate, compatibility-only `beta.1`, and stable `7.8.0` promotion.
 
 ## 7.7-alpha.9
 

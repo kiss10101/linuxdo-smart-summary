@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "7.8.0-alpha.2",
+    [string]$Version = "7.8.0-alpha.3",
     [switch]$All,
     [switch]$SkipVerify
 )
@@ -8,6 +8,22 @@ $ErrorActionPreference = "Stop"
 
 $repo = "kiss10101/linuxdo-smart-summary"
 $releases = @(
+    @{
+        Tag          = "v7.8.0-alpha.3"
+        Name         = "v7.8.0-alpha.3"
+        AssetPattern = "*7.8.0-alpha.3.user.js"
+        AssetName    = "linuxdo-smart-summary-7.8.0-alpha.3.user.js"
+        Prerelease   = $true
+        Body         = @"
+7.8.0-alpha.3 selected-answer actions and floating-menu refinement preview.
+
+- Enables explain, simplify, and quote-to-chat actions for completed AI answer selections while excluding reasoning, streaming, incomplete, error, and cross-message ranges.
+- Adds a saved 80-100% floating-menu opacity preference with accessible blur fallbacks for selection and message menus.
+- Compacts the message action menu and moves summary, chat, and reasoning scrollbars to the left without changing document text direction.
+- Preserves strict separation between provider reasoning and final answer content.
+- Completes the feature scope before compatibility-only 7.8.0-beta.1 validation.
+"@
+    },
     @{
         Tag          = "v7.8.0-alpha.2"
         Name         = "v7.8.0-alpha.2"

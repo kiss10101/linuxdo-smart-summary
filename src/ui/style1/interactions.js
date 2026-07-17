@@ -67,6 +67,7 @@ export const style1Interactions = {
         this.lastSummary = summaryRawText;
         this.postContent = postContent;
         this.closeMessageContextMenu?.();
+        this.closeSummarySelectionMenu?.();
     },
 
     clearChatContext() {
@@ -77,6 +78,7 @@ export const style1Interactions = {
         this.editingMessageId = null;
         this.editingDraftBefore = '';
         this.closeMessageContextMenu?.();
+        this.closeSummarySelectionMenu?.();
     },
 
     syncLegacyChatHistory() {
@@ -159,6 +161,7 @@ export const style1Interactions = {
     renderChatMessages() {
         const Q = this.uiManager.Q.bind(this.uiManager);
         const list = Q('#chat-list');
+        this.closeSummarySelectionMenu?.();
         list.innerHTML = '';
         this.chatSession.visibleMessages.forEach(message => this.addBubble(message));
 
@@ -550,7 +553,7 @@ export const style1Interactions = {
         this.addManagedListener(list, 'contextmenu', (e) => {
             const bubble = this.getClosestElement(e.target, '.bubble[data-message-id]');
             if (!bubble) return;
-            const selection = window.getSelection?.();
+            const selection = this.getCurrentSelection?.();
             if (selection && selection.toString().trim()) return;
             e.preventDefault();
             this.openMessageContextMenu(e, bubble.dataset.messageId);
@@ -620,17 +623,18 @@ export const style1Interactions = {
     bindSummarySelectionMenu() {
         const Q = this.uiManager.Q.bind(this.uiManager);
         const resultBox = Q('#summary-result');
+        const chatList = Q('#chat-list');
         const menu = Q('#summary-selection-menu');
-        if (!resultBox || !menu) return;
+        if (!resultBox || !chatList || !menu) return;
 
-        const scheduleOpen = (event) => {
+        const scheduleOpen = (event, delay = 40) => {
             this.clearManagedTimeout(this.summarySelectionOpenTimerId);
             const requestSeq = (this.summarySelectionRequestSeq || 0) + 1;
             this.summarySelectionRequestSeq = requestSeq;
             this.summarySelectionOpenTimerId = this.setManagedTimeout(() => {
                 this.summarySelectionOpenTimerId = null;
                 if (requestSeq !== this.summarySelectionRequestSeq) return;
-                const selectionState = this.getSummarySelectionState();
+                const selectionState = this.getContentSelectionState();
                 if (selectionState) {
                     this.openSummarySelectionMenu({
                         ...selectionState,
@@ -639,12 +643,20 @@ export const style1Interactions = {
                 } else {
                     this.closeSummarySelectionMenu();
                 }
-            }, 40);
+            }, delay);
         };
 
         this.addManagedListener(resultBox, 'mouseup', scheduleOpen);
         this.addManagedListener(resultBox, 'keyup', scheduleOpen);
-        this.addManagedListener(resultBox, 'touchend', scheduleOpen);
+        this.addManagedListener(resultBox, 'touchend', (event) => scheduleOpen(event, 100));
+        this.addManagedListener(chatList, 'mouseup', scheduleOpen);
+        this.addManagedListener(chatList, 'keyup', scheduleOpen);
+        this.addManagedListener(chatList, 'touchend', (event) => scheduleOpen(event, 100));
+        this.addManagedListener(document, 'selectionchange', (event) => {
+            const selection = this.getCurrentSelection();
+            if (!selection || selection.isCollapsed || !selection.toString().trim()) return;
+            scheduleOpen(event, 90);
+        });
         const closeSummarySelectionOnFrame = this.createFrameThrottledHandler(() => this.closeSummarySelectionMenu());
         this.addManagedListener(resultBox, 'scroll', closeSummarySelectionOnFrame, { passive: true });
         this.addManagedListener(menu, 'mousedown', (e) => e.preventDefault());
@@ -671,10 +683,11 @@ export const style1Interactions = {
             if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
                 nextIndex = currentIndex < 0 ? items.length - 1 : (currentIndex - 1 + items.length) % items.length;
             }
+            items.forEach((item, index) => { item.tabIndex = index === nextIndex ? 0 : -1; });
             items[nextIndex]?.focus();
         });
         this.addManagedListener(document, 'pointerdown', (e) => {
-            if (!this.currentSummarySelection) return;
+            if (!this.currentContentSelection && !this.currentSummarySelection) return;
             const path = e.composedPath?.() || [];
             if (path.includes(menu)) return;
             this.closeSummarySelectionMenu();
@@ -684,7 +697,14 @@ export const style1Interactions = {
     },
 
     getCurrentSelection() {
-        return this.uiManager.shadow?.getSelection?.() || window.getSelection?.() || null;
+        const candidates = [
+            this.uiManager.shadow?.getSelection?.(),
+            window.getSelection?.()
+        ].filter(Boolean);
+        return candidates.find(selection => selection.rangeCount > 0 && !selection.isCollapsed)
+            || candidates.find(selection => selection.rangeCount > 0)
+            || candidates[0]
+            || null;
     },
 
     clearCurrentSelection() {
@@ -700,26 +720,30 @@ export const style1Interactions = {
         });
     },
 
-    getSummarySelectionState() {
-        const Q = this.uiManager.Q.bind(this.uiManager);
-        const resultBox = Q('#summary-result');
-        if (!resultBox || this.currentTab !== 'summary' || !this.hasChatContext()) return null;
+    getContentSelectionState() {
+        if (!this.hasChatContext() || this.editingMessageId) return null;
 
         const selection = this.getCurrentSelection();
         if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
-        if (!Core.isSummarySelectionTextUseful(selection.toString())) return null;
+        const isUseful = Core.isSelectionTextUseful || Core.isSummarySelectionTextUseful;
+        if (!isUseful.call(Core, selection.toString())) return null;
 
         const range = selection.getRangeAt(0);
-        if (!this.isSummarySelectionRangeAllowed(range, resultBox)) return null;
+        const source = this.resolveContentSelectionSource(range);
+        if (!source) return null;
 
         const rect = this.getSelectionAnchorRect(range);
         if (!rect) return null;
 
         const rawText = selection.toString();
-        const normalized = Core.normalizeSummarySelectionText(rawText);
+        const normalize = Core.normalizeSelectionText || Core.normalizeSummarySelectionText;
+        const normalized = normalize.call(Core, rawText);
         return {
             text: rawText.trim(),
             truncated: normalized.truncated,
+            sourceKind: source.sourceKind,
+            messageId: source.messageId || null,
+            returnFocus: source.returnFocus || null,
             rect: {
                 left: rect.left,
                 right: rect.right,
@@ -731,30 +755,61 @@ export const style1Interactions = {
         };
     },
 
-    isSummarySelectionRangeAllowed(range, resultBox) {
-        if (!range || !resultBox) return false;
+    getSummarySelectionState() {
+        return this.getContentSelectionState();
+    },
+
+    getTrustedDirectAnswer(container) {
+        if (!container) return null;
+        const selector = '.ai-output-answer[data-selection-scope="answer"]';
+        const answer = Array.from(container.children || [])
+            .find((child) => child.matches?.(selector));
+        if (!answer || answer.parentElement !== container) return null;
+        if (this.getClosestElement(answer, '[data-thinking-block]')) return null;
+        return answer;
+    },
+
+    resolveContentSelectionSource(range) {
+        if (!range) return null;
         const startNode = range.startContainer?.nodeType === 1 ? range.startContainer : range.startContainer?.parentElement;
         const endNode = range.endContainer?.nodeType === 1 ? range.endContainer : range.endContainer?.parentElement;
         const commonNode = range.commonAncestorContainer?.nodeType === 1
             ? range.commonAncestorContainer
             : range.commonAncestorContainer?.parentElement;
-        if (!startNode || !endNode || !commonNode) return false;
-        if (!resultBox.contains(startNode) || !resultBox.contains(endNode) || !resultBox.contains(commonNode)) return false;
+        if (!startNode || !endNode || !commonNode) return null;
 
-        const excludedSelectors = [
-            '.result-actions',
-            '#btn-copy-summary',
-            '.summary-coverage',
-            '.thinking-header',
-            '[data-thinking-toggle]',
-            '#summary-selection-menu',
-            '.summary-selection-menu'
-        ];
-        return !excludedSelectors.some((selector) => (
-            this.getClosestElement(startNode, selector)
-            || this.getClosestElement(endNode, selector)
-            || this.getClosestElement(commonNode, selector)
-        ));
+        const selector = '.ai-output-answer[data-selection-scope="answer"]';
+        const startAnswer = this.getClosestElement(startNode, selector);
+        const endAnswer = this.getClosestElement(endNode, selector);
+        const commonAnswer = this.getClosestElement(commonNode, selector);
+        if (!startAnswer || startAnswer !== endAnswer || startAnswer !== commonAnswer) return null;
+        if (this.getClosestElement(startAnswer, '[data-thinking-block]')) return null;
+
+        const resultBox = this.uiManager.Q('#summary-result');
+        if (this.currentTab === 'summary' && this.getTrustedDirectAnswer(resultBox) === startAnswer) {
+            return {
+                sourceKind: 'summary-answer',
+                messageId: null,
+                returnFocus: resultBox
+            };
+        }
+
+        if (this.currentTab !== 'chat') return null;
+        const bubble = this.getClosestElement(startAnswer, '.bubble-ai[data-message-id]');
+        const messageId = bubble?.dataset?.messageId;
+        const message = messageId ? this.findVisibleMessage(messageId) : null;
+        if (!bubble || !message || message.role !== 'assistant' || message.status !== 'done') return null;
+        if (this.getTrustedDirectAnswer(bubble) !== startAnswer) return null;
+        if (!this.getMessageCopyText(message).trim()) return null;
+        return {
+            sourceKind: 'assistant-message',
+            messageId,
+            returnFocus: bubble
+        };
+    },
+
+    isSummarySelectionRangeAllowed(range) {
+        return Boolean(this.resolveContentSelectionSource(range));
     },
 
     getSelectionAnchorRect(range) {
@@ -770,14 +825,21 @@ export const style1Interactions = {
         const menu = this.uiManager.Q('#summary-selection-menu');
         if (!menu || !selectionState?.text) return;
         this.closeMessageContextMenu?.();
+        this.currentContentSelection = selectionState;
         this.currentSummarySelection = selectionState;
-        this.currentSummarySelectionReturnFocus = this.uiManager.shadow?.activeElement
+        this.currentSummarySelectionReturnFocus = selectionState.returnFocus
+            || this.uiManager.shadow?.activeElement
             || this.uiManager.Q('#summary-result');
+        menu.setAttribute('aria-label', selectionState.sourceKind === 'assistant-message'
+            ? 'AI 回答选区操作'
+            : '总结选区操作');
+        const items = Array.from(menu.querySelectorAll('.summary-selection-item:not(:disabled)'));
+        items.forEach((item, index) => { item.tabIndex = index === 0 ? 0 : -1; });
         menu.classList.add('show');
         menu.setAttribute('aria-hidden', 'false');
         this.positionSummarySelectionMenu(menu, selectionState.rect);
         if (selectionState.focusMenu) {
-            this.requestManagedFrame(() => menu.querySelector('.summary-selection-item')?.focus());
+            this.requestManagedFrame(() => items[0]?.focus());
         }
     },
 
@@ -821,6 +883,7 @@ export const style1Interactions = {
             menu.setAttribute('aria-hidden', 'true');
         }
         const returnFocus = this.currentSummarySelectionReturnFocus;
+        this.currentContentSelection = null;
         this.currentSummarySelection = null;
         this.currentSummarySelectionReturnFocus = null;
         if (restoreFocus && returnFocus?.isConnected) returnFocus.focus();
@@ -859,10 +922,10 @@ export const style1Interactions = {
 
         const gap = 8;
         const sidebarRect = sidebar.getBoundingClientRect();
-        const maxWidth = Math.max(120, Math.min(240, sidebarRect.width - gap * 2));
+        const maxWidth = Math.max(112, Math.min(180, sidebarRect.width - gap * 2));
         menu.style.maxWidth = `${maxWidth}px`;
 
-        const menuW = Math.min(menu.offsetWidth || 160, maxWidth);
+        const menuW = Math.min(menu.offsetWidth || 112, maxWidth);
         const menuH = menu.offsetHeight || 150;
         const minX = gap;
         const maxX = Math.max(minX, sidebarRect.width - menuW - gap);
@@ -912,7 +975,7 @@ export const style1Interactions = {
     },
 
     async handleSummarySelectionAction(action) {
-        const selection = this.currentSummarySelection;
+        const selection = this.currentContentSelection || this.currentSummarySelection;
         if (!selection?.text) return;
         if (!this.hasChatContext()) {
             this.closeSummarySelectionMenu();
@@ -923,10 +986,23 @@ export const style1Interactions = {
             return this.showToast('正在编辑消息，请先完成或取消编辑', 'error');
         }
 
-        const promptSpec = Core.buildSummarySelectionPrompt(action, selection.text);
-        if (!promptSpec.prompt.trim()) {
+        if (selection.sourceKind === 'assistant-message') {
+            const message = this.findVisibleMessage(selection.messageId);
+            const bubble = this.getBubbleElement(selection.messageId);
+            if (!message || message.role !== 'assistant' || message.status !== 'done'
+                || !this.getTrustedDirectAnswer(bubble)) {
+                this.closeSummarySelectionMenu();
+                return this.showToast('原 AI 回答已发生变化，请重新选择', 'error');
+            }
+        }
+
+        const buildPrompt = Core.buildSelectionPrompt || Core.buildSummarySelectionPrompt;
+        const promptSpec = buildPrompt.call(Core, action, selection.text, {
+            sourceKind: selection.sourceKind || 'summary-answer'
+        });
+        if (!promptSpec?.prompt?.trim()) {
             this.closeSummarySelectionMenu();
-            return this.showToast('选区内容为空', 'error');
+            return this.showToast('当前选区操作不可用', 'error');
         }
 
         const input = this.uiManager.Q('#chat-input');

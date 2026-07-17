@@ -142,7 +142,10 @@ export const renderingCore = {
         const warning = state.partial
             ? '<div class="ai-output-partial" role="status">已保留服务商返回的部分内容，结果可能不完整。</div>'
             : '';
-        if (!reasoning) return `${warning}${content ? this.renderMarkdown(content) : ''}`;
+        const answer = content.trim()
+            ? `<div class="ai-output-answer" data-selection-scope="answer">${this.renderMarkdown(content)}</div>`
+            : '';
+        if (!reasoning) return `${warning}${answer}`;
 
         const expansion = options.expansion || 'auto';
         const autoExpanded = state.phase === 'reasoning' && !content.trim();
@@ -166,9 +169,9 @@ export const renderingCore = {
                 <span class="thinking-toggle" aria-hidden="true">${arrow}</span>
             </button>
             <div class="thinking-preview">${this.renderReasoningPreview(previewText)}</div>
-            <div id="${panelId}" class="thinking-content" role="region" aria-label="服务返回的推理内容" aria-hidden="${!expanded}"${expanded ? '' : ' hidden'}><div class="thinking-content-inner">${reasoningHtml}</div></div>
+            <div id="${panelId}" class="thinking-content" role="region" aria-label="服务返回的推理内容" aria-hidden="${!expanded}"${expanded ? '' : ' hidden'}><div class="thinking-content-inner"><div class="thinking-scroll-content">${reasoningHtml}</div></div></div>
         </div>`;
-        return `${panel}${warning}${content ? this.renderMarkdown(content) : ''}`;
+        return `${panel}${warning}${answer}`;
     },
 
     // 下载文件（优先GM_download，失败则回退到<a download>）

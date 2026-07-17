@@ -25,10 +25,13 @@ test('selection toolbar is semantic and exposes only the three approved actions 
     assert.match(html, /role="toolbar"/);
     assert.match(html, /aria-label="总结选区操作"/);
     orderedIndices(html, [
-        'data-summary-selection-action="explain">解释',
-        'data-summary-selection-action="simplify">精简',
-        'data-summary-selection-action="quote">引用到对话'
+        'data-summary-selection-action="explain"',
+        'data-summary-selection-action="simplify"',
+        'data-summary-selection-action="quote"'
     ]);
+    assert.match(html, /data-summary-selection-action="explain"[^>]*tabindex="0"[^>]*>解释/);
+    assert.match(html, /data-summary-selection-action="simplify"[^>]*tabindex="-1"[^>]*>精简/);
+    assert.match(html, /data-summary-selection-action="quote"[^>]*tabindex="-1"[^>]*>引用到对话/);
     assert.doesNotMatch(html, /data-summary-selection-action="(?:ask|summarize|insert)"/);
 });
 

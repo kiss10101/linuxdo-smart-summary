@@ -11,14 +11,14 @@
 
 <p align="center">
   <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases/download/v7.6.1/linuxdo-smart-summary-7.6.1.user.js">Install stable 7.6.1</a> ·
-  <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases/download/v7.8.0-alpha.2/linuxdo-smart-summary-7.8.0-alpha.2.user.js">Preview 7.8.0-alpha.2</a> ·
+  <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases/download/v7.8.0-alpha.3/linuxdo-smart-summary-7.8.0-alpha.3.user.js">Preview 7.8.0-alpha.3</a> ·
   <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases">Releases</a> ·
   <a href="./CHANGELOG.md">Changelog</a>
 </p>
 
 <p align="center">
   <img alt="stable" src="https://img.shields.io/badge/stable-7.6.1-2563eb">
-  <img alt="preview" src="https://img.shields.io/badge/preview-7.8.0--alpha.2-f59e0b">
+  <img alt="preview" src="https://img.shields.io/badge/preview-7.8.0--alpha.3-f59e0b">
   <img alt="platform" src="https://img.shields.io/badge/platform-linux.do-16a34a">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-64748b">
 </p>
@@ -39,19 +39,19 @@ and `tests/`.
 | Channel | Version | Use when | Notes |
 | --- | --- | --- | --- |
 | Stable | `7.6.1` | You want the safest install target | Repackages the verified `7.6` runtime with pinned marked/DOMPurify dependencies and privacy-clean public fixtures |
-| Preview | `7.8.0-alpha.2` | You want the interaction and default UI preview | Keeps the modular one-file build, consolidates selected-text actions, adds state-aware message controls, and refreshes the default Style2 with accessible narrow-screen behavior |
+| Preview | `7.8.0-alpha.3` | You want the final interaction preview before beta | Extends the answer-only selection toolbar to completed AI replies, adds adjustable floating-menu opacity, compacts message actions, and consistently places summary/chat reading scrollbars on the left |
 
 Release line:
 
 ```text
-7.8.0-alpha.1 -> 7.8.0-alpha.2 -> 7.8.0-beta.1 -> 7.8.0
+7.8.0-alpha.1 -> 7.8.0-alpha.2 -> 7.8.0-alpha.3 -> 7.8.0-beta.1 -> 7.8.0
 ```
 
 GitHub marks the latest non-prerelease as `Latest`; stable `7.6.1` remains the
-default install target while `7.8.0-alpha.2` is the current prerelease preview.
-`alpha.2` is the one-time feature and default-UI gate added after the modular
-source migration. After it, `beta.1` is compatibility-only and `7.8.0` is the
-stable promotion; no further planned feature alpha is part of this route.
+default install target while `7.8.0-alpha.3` is the current prerelease preview.
+`alpha.3` is the final feature gate added with explicit user approval after the
+modular and default-UI alphas. After it, `beta.1` is compatibility/defect-only and
+`7.8.0` is the stable promotion; no further feature alpha is planned.
 Historical `7.7` entries remain in the changelog for auditability, not as
 additional migration stops.
 
@@ -70,7 +70,9 @@ additional migration stops.
 | Upstream error diagnostics | Shows HTTP status, provider error code/type, non-JSON response hints, SSE error frames, and `finish_reason` explanations without exposing API keys |
 | AI control and source | Stops only the active AI provider request, keeps Linux.do fetches uncancelled, and displays the API profile snapshot used by each AI request |
 | Settings sync | Applies remote Tampermonkey setting changes to the current tab's settings UI and chat prompt memory without triggering topic, range, summary, export, or model-list requests |
-| Summary selection | Selected summary text offers explain, simplify, and quote-to-chat actions; quote-to-chat preserves the current draft and never sends automatically |
+| Answer selection | Selected final-answer text in the summary or a completed AI reply offers explain, simplify, and quote-to-chat actions; reasoning, status, and source metadata remain outside the selectable answer boundary, and quote-to-chat never sends automatically |
+| Floating menus | Selection and message-action menus use an adjustable `80%`–`100%` surface opacity (default `88%`) without changing modal, toast, tooltip, or sidebar opacity |
+| Reading scrollbars | Summary and chat reading scrollbars stay on the left through local scroll shells while answer text, code, tables, and horizontal scrolling retain their normal direction |
 | Default UI | Style2 uses a restrained warm-neutral and steel-blue system with keyboard-accessible controls, reduced-motion support, and a narrow-screen overlay fallback; Style1 remains available as the compatibility theme |
 | Reply metadata | Keeps replied-to floor context, including deleted or invisible targets |
 | Quote attribution | Preserves quoted/forwarded Discourse link source user, topic, post number, title, and URL in AI context |
@@ -138,9 +140,9 @@ source, behavior, architecture, privacy, and release check:
 npm ci
 npm run build
 npm run verify
-node --check "dist/Linux.do 智能总结-7.8.0-alpha.2.user.js"
-node tools/verify-release.mjs 7.8.0-alpha.2
-node tools/check-all.mjs 7.8.0-alpha.2
+node --check "dist/Linux.do 智能总结-7.8.0-alpha.3.user.js"
+node tools/verify-release.mjs 7.8.0-alpha.3
+node tools/check-all.mjs 7.8.0-alpha.3
 ```
 
 `dist/` is generated. Make changes in `src/`, run `npm run build`, and commit the
@@ -152,8 +154,8 @@ the generated file is stale or nondeterministic.
 GitHub Releases are published by `.github/workflows/release.yml`.
 
 - Pull requests and `master` pushes run the read-only `CI` workflow.
-- Push a new tag like `v7.8.0-alpha.2` to trigger an automatic release.
-- Use the manual `Release` workflow with input `7.8.0-alpha.2` to publish or repair an existing tag release.
+- Push a new tag like `v7.8.0-alpha.3` to trigger an automatic release.
+- Use the manual `Release` workflow with input `7.8.0-alpha.3` to publish or repair an existing tag release.
 - A normal `master` push does not publish a release; the release job is tag/manual only.
 - The workflow installs from `package-lock.json`, rebuilds `dist/`, rejects generated drift, runs the complete verification suite, and uploads the manifest-selected asset with GitHub Actions' `GITHUB_TOKEN`.
 

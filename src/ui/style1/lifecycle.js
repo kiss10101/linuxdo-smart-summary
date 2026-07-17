@@ -31,6 +31,7 @@ export const style1Lifecycle = {
         this.editingDraftBefore = '';
         this.currentMessageMenuId = null;
         this.currentMessageMenuReturnFocus = null;
+        this.currentContentSelection = null;
         this.currentSummarySelection = null;
         this.currentSummarySelectionReturnFocus = null;
         this.summarySelectionOpenTimerId = null;
@@ -98,6 +99,7 @@ export const style1Lifecycle = {
         this.scrollButtonsFrame = null;
         this.summarySelectionOpenTimerId = null;
         this.summarySelectionRequestSeq = (this.summarySelectionRequestSeq || 0) + 1;
+        this.currentContentSelection = null;
         this.currentSummarySelection = null;
         this.currentSummarySelectionReturnFocus = null;
         this.resetGlobalUiState();
@@ -255,9 +257,9 @@ export const style1Lifecycle = {
     getSummarySelectionMenuHtml() {
         return `
             <div class="summary-selection-menu" id="summary-selection-menu" role="toolbar" aria-label="总结选区操作" aria-hidden="true">
-                <button type="button" class="summary-selection-item" data-summary-selection-action="explain">解释</button>
-                <button type="button" class="summary-selection-item" data-summary-selection-action="simplify">精简</button>
-                <button type="button" class="summary-selection-item" data-summary-selection-action="quote">引用到对话</button>
+                <button type="button" class="summary-selection-item" data-summary-selection-action="explain" tabindex="0">解释</button>
+                <button type="button" class="summary-selection-item" data-summary-selection-action="simplify" tabindex="-1">精简</button>
+                <button type="button" class="summary-selection-item" data-summary-selection-action="quote" tabindex="-1">引用到对话</button>
             </div>
         `;
     },
