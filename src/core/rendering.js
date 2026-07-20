@@ -108,10 +108,6 @@ export const renderingCore = {
         return this.escapeHtml(`${text ?? ''}`).replace(/\n/g, '<br>');
     },
 
-    renderStreamingContentPreview(text) {
-        return this.escapeHtml(`${text ?? ''}`).replace(/\n/g, '<br>');
-    },
-
     renderReasoningMarkdown(text) {
         const source = `${text ?? ''}`;
         const markdownLib = this.getMarked();
@@ -146,9 +142,7 @@ export const renderingCore = {
         const warning = state.partial
             ? '<div class="ai-output-partial" role="status">已保留服务商返回的部分内容，结果可能不完整。</div>'
             : '';
-        const answerHtml = options.isStreaming === true
-            ? this.renderStreamingContentPreview(content)
-            : this.renderMarkdown(content);
+        const answerHtml = this.renderMarkdown(content);
         const answer = content.trim()
             ? `<div class="ai-output-answer" data-selection-scope="answer">${answerHtml}</div>`
             : '';

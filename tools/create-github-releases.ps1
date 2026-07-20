@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "7.8.0-beta.1",
+    [string]$Version = "7.8.0-beta.2",
     [switch]$All,
     [switch]$SkipVerify
 )
@@ -8,6 +8,28 @@ $ErrorActionPreference = "Stop"
 
 $repo = "kiss10101/linuxdo-smart-summary"
 $releases = @(
+    @{
+        Tag          = "v7.8.0-beta.2"
+        Name         = "v7.8.0-beta.2"
+        AssetPattern = "*7.8.0-beta.2.user.js"
+        AssetName    = "linuxdo-smart-summary-7.8.0-beta.2.user.js"
+        Prerelease   = $true
+        Body         = @"
+7.8.0-beta.2 流式 Markdown 实时渲染修复。
+
+中文说明：
+- 修复总结与对话页面在 AI 流式输出期间显示原始 Markdown 标记、完成后才渲染的问题。
+- 最终答案在每个合并后的节流渲染批次实时解析 Markdown，并继续经过 DOMPurify 清理。
+- 保留 `80 / 140 / 220ms` 自适应渲染合并、推理流式纯文本安全边界和完成时同步刷新。
+- 增加共享渲染器行为测试与静态性能契约；源码测试增至 81 项。
+
+English:
+- Fixes summary and chat answers exposing raw Markdown markers while streaming and rendering only after completion.
+- Parses and sanitizes answer Markdown on every coalesced render update instead of every provider token.
+- Preserves the `80 / 140 / 220ms` adaptive cadence, escaped streaming reasoning, and final synchronous refresh.
+- Adds shared-renderer regression coverage and a static performance contract; the source suite now contains 81 tests.
+"@
+    },
     @{
         Tag          = "v7.8.0-beta.1"
         Name         = "v7.8.0-beta.1"

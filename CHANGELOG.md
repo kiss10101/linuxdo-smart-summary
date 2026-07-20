@@ -1,5 +1,23 @@
 # Changelog
 
+## 7.8.0-beta.2
+
+### 中文说明
+
+- 修复总结和对话页面的 AI 最终答案在流式输出期间暴露 `#`、`**`、代码围栏等原始 Markdown 标记，直到输出完成后才突然渲染的问题。
+- 恢复最终答案的实时 Markdown 解析与 DOMPurify 清理；每次实际渲染仍通过现有的 `80 / 140 / 220ms` 自适应调度合并多个流式片段，不退回到每个 token 都重绘。
+- 保持推理区的既有安全边界：流式推理继续显示转义纯文本，完成后才使用更严格的 Markdown 清理策略；推理内容与最终答案仍完全隔离。
+- 保留完成回调的同步最终刷新，确保最后一个尚未执行的节流片段不会丢失，也不会被迟到的流式任务覆盖。
+- 增加共享 renderer 行为测试和静态性能契约，明确锁定“最终答案实时 Markdown、推理流式纯文本、解析发生在调度后的实际渲染而非每个 chunk”这一边界；源码测试增至 81 项。
+
+### English
+
+- Fixes summary and chat answers exposing raw Markdown markers such as headings, emphasis, and code fences while streaming, then switching to rendered HTML only after completion.
+- Restores sanitized Markdown rendering for every scheduled answer update while retaining the existing `80 / 140 / 220ms` adaptive coalescing instead of rendering every token.
+- Keeps streaming reasoning escaped as plain text and applies its stricter Markdown policy only after completion, preserving the separation between reasoning and final answers.
+- Preserves the synchronous final refresh so the last coalesced delta cannot be lost or overwritten by a late streaming task.
+- Adds shared-renderer behavior coverage and a static performance contract for real-time answer Markdown; the source suite now contains 81 tests.
+
 ## 7.8.0-beta.1
 
 - Promotes the completed `7.8.0` alpha feature line into compatibility and defect closure without adding user-facing features, storage migrations, provider schema changes, or background Linux.do requests.

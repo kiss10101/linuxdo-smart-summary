@@ -42,6 +42,8 @@ expectIncludes('this.scheduleSummaryRender(resultBox, () => outputState)', 'summ
 expectIncludes('this.scheduleBubbleRender(targetAssistant.id, bubble, () => outputState)', 'chat stream schedules structured output state');
 expectNotIncludes('this.updateResultBox(resultBox, outputState, true);', 'summary stream direct render');
 expectNotIncludes('this.updateBubble(bubble, outputState, true);', 'chat stream direct render');
+expectIncludes('const answerHtml = this.renderMarkdown(content);', 'scheduled streaming answers render Markdown');
+expectNotIncludes('renderStreamingContentPreview', 'raw streaming answer preview regression');
 
 expectIncludes('createFrameThrottledHandler(handler)', 'frame throttled helper');
 expectMatch(/window,\s*'mousemove'[\s\S]*?\{ passive: true \}/, 'global mousemove listeners are passive/throttled');

@@ -11,14 +11,14 @@
 
 <p align="center">
   <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases/download/v7.6.1/linuxdo-smart-summary-7.6.1.user.js">Install stable 7.6.1</a> ·
-  <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases/download/v7.8.0-beta.1/linuxdo-smart-summary-7.8.0-beta.1.user.js">Preview 7.8.0-beta.1</a> ·
+  <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases/download/v7.8.0-beta.2/linuxdo-smart-summary-7.8.0-beta.2.user.js">Preview 7.8.0-beta.2</a> ·
   <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases">Releases</a> ·
   <a href="./CHANGELOG.md">Changelog</a>
 </p>
 
 <p align="center">
   <img alt="stable" src="https://img.shields.io/badge/stable-7.6.1-2563eb">
-  <img alt="preview" src="https://img.shields.io/badge/preview-7.8.0--beta.1-f59e0b">
+  <img alt="preview" src="https://img.shields.io/badge/preview-7.8.0--beta.2-f59e0b">
   <img alt="platform" src="https://img.shields.io/badge/platform-linux.do-16a34a">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-64748b">
 </p>
@@ -39,19 +39,19 @@ and `tests/`.
 | Channel | Version | Use when | Notes |
 | --- | --- | --- | --- |
 | Stable | `7.6.1` | You want the safest install target | Repackages the verified `7.6` runtime with pinned marked/DOMPurify dependencies and privacy-clean public fixtures |
-| Preview | `7.8.0-beta.1` | You want the complete 7.8 feature set with compatibility and resource-use closure | Keeps the alpha feature set while reducing streaming work, bounding transient caches and offline-image export, and tightening browser lifecycle behavior |
+| Preview | `7.8.0-beta.2` | You want the complete 7.8 feature set with real-time Markdown streaming | Fixes raw Markdown markers appearing during generation while preserving adaptive render coalescing, resource budgets, and browser lifecycle hardening |
 
 Release line:
 
 ```text
-7.8.0-alpha.1 -> 7.8.0-alpha.2 -> 7.8.0-alpha.3 -> 7.8.0-alpha.4 -> 7.8.0-beta.1 -> 7.8.0
+7.8.0-alpha.1 -> 7.8.0-alpha.2 -> 7.8.0-alpha.3 -> 7.8.0-alpha.4 -> 7.8.0-beta.1 -> 7.8.0-beta.2 -> 7.8.0
 ```
 
 GitHub marks the latest non-prerelease as `Latest`; stable `7.6.1` remains the
-default install target while `7.8.0-beta.1` is the current prerelease preview.
-The beta closes compatibility, defect, and resource-use risks after the completed
-alpha feature line. `7.8.0` is the next planned release and stable promotion; no
-additional prerelease feature work is planned.
+default install target while `7.8.0-beta.2` is the current prerelease preview.
+`beta.2` is a bounded regression fix that restores real-time Markdown rendering
+without reopening feature scope. `7.8.0` remains the next planned release and
+stable promotion; no additional prerelease feature work is planned.
 Historical `7.7` entries remain in the changelog for auditability, not as
 additional migration stops.
 
@@ -62,7 +62,7 @@ additional migration stops.
 | Floor range mapping | Uses `post.post_number`; range shortcuts can prefill from cached topic metadata but still confirm all/recent with no-store topic `highest_post_number` |
 | Linux.do request cadence | Fetches posts in serial `posts.json` batches |
 | Large range guard | Stops oversized summary/export ranges before unbounded `posts.json` batch growth |
-| Runtime scheduling | Streams escaped plain-text previews, renders final Markdown once, adapts update cadence for long output, and coalesces high-frequency scroll/resize work |
+| Runtime scheduling | Renders sanitized answer Markdown on each coalesced streaming update, adapts the cadence to `80 / 140 / 220ms` for longer output, keeps streaming reasoning escaped as plain text, and coalesces scroll/resize work |
 | Topic-page bootstrap | Creates the sidebar only on Linux.do topic routes, with a lightweight SPA route watcher elsewhere |
 | SPA workspace lifetime | Preserves one in-memory summary/chat workspace across direct topic-to-topic navigation, identifies its source topic, confirms replacement on a different topic, and tears it down when leaving topic routes |
 | AI retry path | Reuses current-tab summary text after AI empty/error responses |
@@ -141,9 +141,9 @@ source, behavior, architecture, privacy, and release check:
 npm ci
 npm run build
 npm run verify
-node --check "dist/Linux.do 智能总结-7.8.0-beta.1.user.js"
-node tools/verify-release.mjs 7.8.0-beta.1
-node tools/check-all.mjs 7.8.0-beta.1
+node --check "dist/Linux.do 智能总结-7.8.0-beta.2.user.js"
+node tools/verify-release.mjs 7.8.0-beta.2
+node tools/check-all.mjs 7.8.0-beta.2
 ```
 
 `dist/` is generated. Make changes in `src/`, run `npm run build`, and commit the
@@ -155,8 +155,8 @@ the generated file is stale or nondeterministic.
 GitHub Releases are published by `.github/workflows/release.yml`.
 
 - Pull requests and `master` pushes run the read-only `CI` workflow.
-- Push a new tag like `v7.8.0-beta.1` to trigger an automatic release.
-- Use the manual `Release` workflow with input `7.8.0-beta.1` to publish or repair an existing tag release.
+- Push a new tag like `v7.8.0-beta.2` to trigger an automatic release.
+- Use the manual `Release` workflow with input `7.8.0-beta.2` to publish or repair an existing tag release.
 - A normal `master` push does not publish a release; the release job is tag/manual only.
 - The workflow installs from `package-lock.json`, rebuilds `dist/`, rejects generated drift, runs the complete verification suite, and uploads the manifest-selected asset with GitHub Actions' `GITHUB_TOKEN`.
 

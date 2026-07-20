@@ -7,7 +7,7 @@
 - Make the published file reproducible from committed source and a locked toolchain.
 - Preserve the verified Linux.do request policy and existing runtime behavior.
 - Keep the architecture migration route bounded to one source gate, two explicitly approved
-  feature/UI gates, one compatibility gate, and stable promotion.
+  feature/UI gates, two defect/compatibility beta gates, and stable promotion.
 
 ## Source And Artifact Boundary
 
@@ -171,7 +171,7 @@ unrelated decomposition remains maintenance work, not another release stage.
 ## Short Release Route
 
 ```text
-7.8.0-alpha.1 -> 7.8.0-alpha.2 -> 7.8.0-alpha.3 -> 7.8.0-alpha.4 -> 7.8.0-beta.1 -> 7.8.0
+7.8.0-alpha.1 -> 7.8.0-alpha.2 -> 7.8.0-alpha.3 -> 7.8.0-alpha.4 -> 7.8.0-beta.1 -> 7.8.0-beta.2 -> 7.8.0
 ```
 
 - `alpha.1`: validates source/build equivalence, module boundaries, and maintainer workflow.
@@ -182,13 +182,15 @@ unrelated decomposition remains maintenance work, not another release stage.
 - `alpha.4`: explicitly approved lifecycle-fix exception that preserves one summary/chat
   workspace across topic navigation, identifies its source, confirms replacement, and keeps
   in-flight work and automatic ranges bound to the correct topic.
-- `beta.1`: reserved for real-user compatibility fixes found in alpha; no new features.
+- `beta.1`: closes browser compatibility and transient resource-budget findings; no new features.
+- `beta.2`: bounded regression fix that restores real-time sanitized Markdown for final
+  answers while retaining adaptive render coalescing and escaped streaming reasoning.
 - `7.8.0`: stable promotion after beta acceptance; no architecture expansion.
 
 Alpha.3 remains the last feature gate. Alpha.4 is a separately approved, bounded correction to
 SPA workspace lifetime and does not reopen feature scope. There are no planned further alpha or
-release-candidate stages. Beta.1 remains limited to real-user compatibility and defect closure;
-new features must not be moved into beta. The six-stage route is stored in
+release-candidate stages. Both beta stages remain limited to compatibility and defect closure;
+new features must not be moved into beta. The seven-stage route is stored in
 `tools/release-manifest.json` and enforced by release verification.
 
 ## GitHub Automation
@@ -216,6 +218,26 @@ Recommended repository settings are:
 5. Commit source and its matching generated artifact as one reviewable change.
 
 ## Change History
+
+### 2026-07-20 - Streaming Markdown regression correction
+
+**Change**: Added beta.2 to restore sanitized Markdown rendering for the final answer during
+each coalesced streaming update in summary and chat, while leaving streamed reasoning as
+escaped plain text and retaining the final synchronous render.
+
+**Reason**: Beta.1's lightweight plain-text answer preview reduced parsing work but exposed
+Markdown syntax until completion, regressing the established reading experience. The existing
+adaptive `80 / 140 / 220ms` scheduler already provides the required work bound without
+sacrificing live formatting.
+
+**Impact**: One shared answer-rendering branch, focused behavior coverage, a static runtime
+performance contract, release metadata, documentation, and the generated beta asset. Request
+protocols, stored settings, provider schemas, reasoning isolation, Linux.do traffic, and public
+runtime APIs remain unchanged.
+
+**Decision**: Treat beta.2 as a defect-only correction. Reuse the existing renderer,
+DOMPurify boundary, and adaptive scheduler instead of adding an incremental Markdown parser,
+worker, framework, or new dependency; stable `7.8.0` remains the next planned version.
 
 ### 2026-07-20 - Beta compatibility and resource closure
 

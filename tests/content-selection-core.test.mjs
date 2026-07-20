@@ -31,6 +31,46 @@ test('renderAiOutputHtml omits the answer boundary for whitespace-only final con
     assert.doesNotMatch(html, /ai-output-answer/);
 });
 
+test('streaming answers render sanitized Markdown while reasoning stays escaped text', (t) => {
+    const originalMarked = globalThis.marked;
+    const originalDOMPurify = globalThis.DOMPurify;
+    t.after(() => {
+        globalThis.marked = originalMarked;
+        globalThis.DOMPurify = originalDOMPurify;
+    });
+
+    const parsedSources = [];
+    const sanitizedHtml = [];
+    globalThis.marked = {
+        parse(source) {
+            parsedSources.push(source);
+            return '<h1>标题</h1><p><strong>加粗</strong></p>';
+        }
+    };
+    globalThis.DOMPurify = {
+        sanitize(html) {
+            sanitizedHtml.push(html);
+            return html;
+        }
+    };
+
+    const html = Core.renderAiOutputHtml(Core.createAiOutputState({
+        reasoningText: '**推理** <img src="https://example.invalid/reasoning.png">',
+        contentText: '# 标题\n\n**加粗**',
+        phase: 'answering'
+    }), {
+        isStreaming: true,
+        panelId: 'streaming-markdown'
+    });
+
+    assert.deepEqual(parsedSources, ['# 标题\n\n**加粗**']);
+    assert.deepEqual(sanitizedHtml, ['<h1>标题</h1><p><strong>加粗</strong></p>']);
+    assert.match(html, /<div class="ai-output-answer"[^>]*><h1>标题<\/h1><p><strong>加粗<\/strong><\/p><\/div>/);
+    assert.match(html, /\*\*推理\*\* &lt;img src=&quot;https:\/\/example\.invalid\/reasoning\.png&quot;&gt;/);
+    assert.doesNotMatch(html, /<strong>推理<\/strong>/);
+    assert.doesNotMatch(html, /<img src="https:\/\/example\.invalid\/reasoning\.png">/);
+});
+
 test('selection prompts use source-specific wording and an explicit quoted-data safety boundary', () => {
     const summary = Core.buildSelectionPrompt('explain', '原帖结论', {
         sourceKind: 'summary-answer'
