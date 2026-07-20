@@ -163,7 +163,8 @@ export const style1Interactions = {
         const list = Q('#chat-list');
         this.closeSummarySelectionMenu?.();
         list.innerHTML = '';
-        this.chatSession.visibleMessages.forEach(message => this.addBubble(message));
+        this.chatSession.visibleMessages.forEach(message => this.addBubble(message, undefined, { scroll: false }));
+        if (this.chatSession.visibleMessages.length > 0) this.scrollToBottom();
 
         const empty = Q('#chat-empty');
         if (this.chatSession.visibleMessages.length > 0) {
@@ -228,7 +229,11 @@ export const style1Interactions = {
             regenerateFromUserId: userMessage.id
         });
         this.renderChatMessages();
-        const msgDiv = this.getBubbleElement(targetAssistant.id);
+        let msgDiv = this.getBubbleElement(targetAssistant.id);
+        const getActiveBubble = () => {
+            if (!msgDiv?.isConnected) msgDiv = this.getBubbleElement(targetAssistant.id);
+            return msgDiv;
+        };
 
         const outputState = Core.createAiOutputState();
         const abortController = this.startAiAbortController('chat');
@@ -251,12 +256,13 @@ export const style1Interactions = {
                 (event) => {
                     if (!this.isCurrentChatRequest(request)) return;
                     Core.applyAiOutputEvent(outputState, event);
-                    this.setVisibleMessage(targetAssistant.id, {
+                    Object.assign(targetAssistant, {
                         rawContent: outputState.contentText,
                         outputState,
-                        status: 'streaming'
+                        status: 'streaming',
+                        updatedAt: Date.now()
                     });
-                    const bubble = this.getBubbleElement(targetAssistant.id);
+                    const bubble = getActiveBubble();
                     if (bubble) this.scheduleBubbleRender(targetAssistant.id, bubble, () => outputState);
                 },
                 (meta = {}) => {
@@ -280,7 +286,7 @@ export const style1Interactions = {
                             excludeFromApi: false,
                             regenerateFromUserId: userMessage.id
                         });
-                        const bubble = this.getBubbleElement(targetAssistant.id);
+                        const bubble = getActiveBubble();
                         if (bubble) this.updateBubble(bubble, outputState, false);
                     } else {
                         this.setChatRequestPhase(request, 'failed');
@@ -302,7 +308,7 @@ export const style1Interactions = {
                             excludeFromApi: true,
                             regenerateFromUserId: userMessage.id
                         });
-                        const bubble = this.getBubbleElement(targetAssistant.id);
+                        const bubble = getActiveBubble();
                         if (bubble) this.renderBubbleContent(bubble, this.findVisibleMessage(targetAssistant.id));
                         this.showToast('回复失败: ' + formatted.toast, 'error');
                     }
@@ -327,7 +333,7 @@ export const style1Interactions = {
                         excludeFromApi: true,
                         regenerateFromUserId: userMessage.id
                     });
-                    const bubble = this.getBubbleElement(targetAssistant.id);
+                    const bubble = getActiveBubble();
                     if (bubble) this.renderBubbleContent(bubble, this.findVisibleMessage(targetAssistant.id));
                     if (!Core.isAiAbortFailure(failure)) {
                         this.showToast('回复失败: ' + formatted.toast, 'error');
@@ -347,7 +353,7 @@ export const style1Interactions = {
             }
         }
 
-        if (msgDiv) this.scrollToBottom();
+        if (getActiveBubble()) this.scrollToBottom();
     },
 
     getMessageCopyText(message) {
@@ -1034,8 +1040,8 @@ export const style1Interactions = {
         input.value = current
             ? `${current}\n\n---\n${prompt}`
             : prompt;
-        input.style.height = 'auto';
-        input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+        if (typeof this.resizeChatInput === 'function') this.resizeChatInput(input);
+        else input.style.height = 'auto';
         input.focus();
     },
 
@@ -1058,8 +1064,8 @@ export const style1Interactions = {
         this.editingMessageId = messageId;
         this.editingDraftBefore = input.value;
         input.value = message.role === 'assistant' ? (message.content || '') : (message.content || '');
-        input.style.height = 'auto';
-        input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+        if (typeof this.resizeChatInput === 'function') this.resizeChatInput(input);
+        else input.style.height = 'auto';
         this.renderChatMessages();
         this.updateChatInputMode();
         input.focus();
@@ -1091,7 +1097,8 @@ export const style1Interactions = {
         this.editingMessageId = null;
         this.editingDraftBefore = '';
         input.value = '';
-        input.style.height = 'auto';
+        if (typeof this.resizeChatInput === 'function') this.resizeChatInput(input);
+        else input.style.height = 'auto';
         this.updateChatInputMode();
         this.renderChatMessages();
 
@@ -1106,8 +1113,8 @@ export const style1Interactions = {
         const input = this.uiManager.Q('#chat-input');
         if (input) {
             input.value = this.editingDraftBefore || '';
-            input.style.height = 'auto';
-            input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+            if (typeof this.resizeChatInput === 'function') this.resizeChatInput(input);
+            else input.style.height = 'auto';
         }
         this.editingMessageId = null;
         this.editingDraftBefore = '';

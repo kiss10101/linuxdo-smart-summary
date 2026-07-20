@@ -17,10 +17,12 @@ export const postFetcherCore = {
     },
 
     async fetchTopicPosts(topicId, start, end, onProgress, options = {}) {
-        const opts = this.getLinuxDoFetchOptions();
+        const opts = this.getLinuxDoFetchOptions({ signal: options.signal });
+        this.throwIfAborted?.(options.signal);
         const { topicData } = await this.fetchTopicData(topicId, opts, {
             forceRefresh: options.forceRefreshTopicData === true
         });
+        this.throwIfAborted?.(options.signal);
         const topicBounds = this.getTopicBoundsFromTopicData(topicData, topicId);
         const streamIds = this.getTopicStreamIds(topicData);
 
@@ -49,6 +51,7 @@ export const postFetcherCore = {
         let lastMapping = null;
 
         for (const lookBehindIds of lookBehindRounds) {
+            this.throwIfAborted?.(options.signal);
             const streamWindow = this.getTopicStreamWindow(streamIds, start, end, lookBehindIds);
             const idsToFetch = streamWindow.ids.filter(id => !postsById.has(id));
             const batchCount = Math.ceil(idsToFetch.length / Math.max(1, this.linuxDoPostFetchPolicy.batchSize));

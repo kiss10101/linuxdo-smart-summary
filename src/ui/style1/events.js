@@ -76,10 +76,8 @@ export const style1Events = {
             btn.style.cursor = 'grabbing';
             e.preventDefault();
         });
-        this.addManagedListener(btn, 'keydown', (e) => {
-            if (e.key !== 'Enter' && e.key !== ' ') return;
-            e.preventDefault();
-            this.toggleSidebar();
+        this.addManagedListener(btn, 'click', (e) => {
+            if (e.detail === 0) this.toggleSidebar();
         });
 
         this.addManagedListener(window, 'mousemove', (e) => {
@@ -104,7 +102,8 @@ export const style1Events = {
             if (hasMoved && !this.isOpen) {
                 const btnRect = btn.getBoundingClientRect();
                 this.side = (btnRect.left + btnRect.width / 2) < window.innerWidth / 2 ? 'left' : 'right';
-                let newTop = Math.max(10, Math.min(btnRect.top, window.innerHeight - 60));
+                const viewportHeight = Number(window.visualViewport?.height) || window.innerHeight;
+                let newTop = Math.max(10, Math.min(btnRect.top, viewportHeight - 60));
                 this.btnPos = { side: this.side, top: `${newTop}px` };
                 GM_setValue(this.getStyleStorageKey('btnPos'), this.btnPos);
                 btn.style.top = `${newTop}px`;
@@ -198,14 +197,15 @@ export const style1Events = {
         Q('#btn-summary').onclick = () => this.handleSummaryButtonClick();
         Q('#btn-refresh-summary-cache').onclick = () => this.refreshSummaryCache();
         Q('#btn-send').onclick = () => this.handleSendButtonClick();
-        Q('#chat-input').onkeydown = (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.doChat(); }
-        };
-        Q('#chat-input').addEventListener('input', (e) => {
-            const el = e.target;
-            el.style.height = 'auto';
-            el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+        const chatInput = Q('#chat-input');
+        this.addManagedListener(chatInput, 'keydown', (e) => {
+            const isComposing = e.isComposing || e.keyCode === 229;
+            if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
+                e.preventDefault();
+                this.doChat();
+            }
         });
+        this.addManagedListener(chatInput, 'input', (e) => this.scheduleChatInputResize(e.target));
         Q('#btn-clear-chat').onclick = () => this.clearChat();
         Q('#btn-scroll-top').onclick = () => this.scrollToTop();
         Q('#btn-scroll-bottom').onclick = () => this.forceScrollToBottom();
@@ -252,12 +252,22 @@ export const style1Events = {
                 this.updateSummaryScrollButton();
             });
         }, { passive: true });
-        this.addManagedListener(window, 'resize', this.createFrameThrottledHandler(() => {
-            this.squeezeBody(this.isOpen);
-            this.updateButtonPosition(false);
+        const handleViewportChange = this.createFrameThrottledHandler(() => {
+            this.syncVisualViewport();
+            if (typeof this.applyResponsiveLayout === 'function') {
+                this.applyResponsiveLayout();
+            } else {
+                this.squeezeBody(this.isOpen);
+                this.updateButtonPosition(false);
+            }
             this.updateScrollButtons();
             this.updateSummaryScrollButton();
-        }));
+        });
+        this.addManagedListener(window, 'resize', handleViewportChange);
+        if (window.visualViewport) {
+            this.addManagedListener(window.visualViewport, 'resize', handleViewportChange);
+        }
+        this.syncVisualViewport();
 
         this.addManagedListener(Q('#cfg-profile-list'), 'click', (e) => {
             const card = this.getClosestElement(e.target, '.api-profile-card');
@@ -332,8 +342,32 @@ export const style1Events = {
         Q('#btn-cancel-workspace-replace').onclick = () => this.closeWorkspaceReplacementConfirm(false);
         Q('#btn-close-workspace-replace').onclick = () => this.closeWorkspaceReplacementConfirm(false);
 
-        this.addManagedListener(Q('#model-picker-modal'), 'click', (e) => {
+        const modelPickerModal = Q('#model-picker-modal');
+        this.addManagedListener(modelPickerModal, 'click', (e) => {
             if (e.target?.id === 'model-picker-modal') this.closeModelPicker();
+        });
+        this.addManagedListener(modelPickerModal, 'keydown', (e) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                e.stopPropagation();
+                this.closeModelPicker();
+                return;
+            }
+            if (e.key !== 'Tab') return;
+            const controls = [...modelPickerModal.querySelectorAll(
+                'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            )];
+            if (controls.length === 0) return;
+            const first = controls[0];
+            const last = controls[controls.length - 1];
+            const activeElement = modelPickerModal.getRootNode().activeElement;
+            if (e.shiftKey && (activeElement === first || !modelPickerModal.contains(activeElement))) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
         });
         this.addManagedListener(Q('#workspace-replace-modal'), 'click', (e) => {
             if (e.target?.id === 'workspace-replace-modal') this.closeWorkspaceReplacementConfirm(false);
@@ -341,6 +375,7 @@ export const style1Events = {
         this.addManagedListener(Q('#workspace-replace-modal'), 'keydown', (e) => {
             if (e.key === 'Escape') {
                 e.preventDefault();
+                e.stopPropagation();
                 this.closeWorkspaceReplacementConfirm(false);
                 return;
             }

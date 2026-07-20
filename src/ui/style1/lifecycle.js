@@ -20,7 +20,15 @@ export const style1Lifecycle = {
         this.streamingRenderDelayMs = 80;
         this.summaryRenderTask = null;
         this.bubbleRenderTasks = new Map();
-        this.scrollButtonsFrame = null;
+        this.chatInputResizeFrameId = null;
+        this.chatInputResizeTarget = null;
+        this.chatInputMaxHeights = new WeakMap();
+        this.chatScrollFrameId = null;
+        this.chatScrollResetTimerId = null;
+        this.chatScrollForce = false;
+        this.summaryScrollFrameId = null;
+        this.summaryScrollResetTimerId = null;
+        this.summaryScrollForce = false;
         this.btnPos = GM_getValue(this.getStyleStorageKey('btnPos'), { side: 'right', top: '50%' });
         this.side = this.btnPos.side;
         this.sidebarWidth = GM_getValue(this.getStyleStorageKey('sidebarWidth'), 420);
@@ -45,6 +53,7 @@ export const style1Lifecycle = {
         this.modelListTimeoutId = null;
         this.modelListLoading = false;
         this.modelListTimeoutMs = 15_000;
+        this.modelPickerReturnFocus = null;
         this.currentAiAbortController = null;
         this.currentAiAbortScope = '';
         this.activeChatRequest = null;
@@ -72,6 +81,8 @@ export const style1Lifecycle = {
         this.apiProfilePersistTimerId = null;
         this.rangeRequestSeq = 0;
         this.exportRangeRequestSeq = 0;
+        this.exportRequestSeq = 0;
+        this.activeExportRequest = null;
         this.rangeMode = 'manual';
         this.exportRangeMode = 'manual';
         this.rangeBoundsTopicId = '';
@@ -88,9 +99,11 @@ export const style1Lifecycle = {
 
     destroy() {
         this.closeWorkspaceReplacementConfirm?.(false, { restoreFocus: false });
+        this.closeModelPicker?.({ restoreFocus: false });
         if (this.activeSummaryRequest) this.abortActiveSummaryRequest?.('destroy');
         if (this.activeChatRequest) this.abortActiveChatRequest?.('close');
-        this.cancelModelListRequest();
+        this.abortActiveExportRequest?.('destroy');
+        this.cancelModelListRequest?.();
         this._cleanupFns?.forEach((cleanup) => cleanup());
         this._cleanupFns = [];
         this._timerIds?.forEach((timerId) => clearTimeout(timerId));
@@ -105,15 +118,37 @@ export const style1Lifecycle = {
         this._frameIds?.clear();
         this.summaryRenderTask = null;
         this.bubbleRenderTasks?.clear();
-        this.scrollButtonsFrame = null;
+        this.chatInputResizeFrameId = null;
+        this.chatInputResizeTarget = null;
+        this.chatInputMaxHeights = new WeakMap();
+        this.chatScrollFrameId = null;
+        this.chatScrollResetTimerId = null;
+        this.chatScrollForce = false;
+        this.summaryScrollFrameId = null;
+        this.summaryScrollResetTimerId = null;
+        this.summaryScrollForce = false;
         this.summarySelectionOpenTimerId = null;
         this.summarySelectionRequestSeq = (this.summarySelectionRequestSeq || 0) + 1;
         this.currentContentSelection = null;
         this.currentSummarySelection = null;
         this.currentSummarySelectionReturnFocus = null;
+        this.currentMessageMenuId = null;
+        this.currentMessageMenuReturnFocus = null;
+        this.modelPickerReturnFocus = null;
+        this.workspaceReplacementReturnFocus = null;
+        this.activeSummaryRequest = null;
+        this.activeChatRequest = null;
+        this.activeExportRequest = null;
+        this.currentAiAbortController = null;
+        this.currentAiAbortScope = '';
+        this.pendingSettingsStorageSyncKeys?.clear();
+        this.dirtySettingsKeys?.clear();
+        this.apiProfiles = [];
+        this.clearChatContext?.();
         this.lifecycleEpoch = null;
         this.resetGlobalUiState();
         this.isOpen = false;
+        this.uiManager = null;
     },
 
     getStyleStorageKey(key) {
@@ -186,6 +221,49 @@ export const style1Lifecycle = {
         };
     },
 
+    getStreamingRenderDelay(output) {
+        const content = output && typeof output === 'object'
+            ? `${output.reasoningText || ''}${output.contentText || output.content || ''}`
+            : `${output ?? ''}`;
+        if (content.length > 32_768) return 220;
+        if (content.length > 8_192) return 140;
+        return this.streamingRenderDelayMs;
+    },
+
+    syncVisualViewport() {
+        if (!this.uiManager?.host || typeof window === 'undefined') return;
+        const viewport = window.visualViewport;
+        const height = Math.max(1, Number(viewport?.height) || window.innerHeight || 1);
+        const width = Math.max(1, Number(viewport?.width) || window.innerWidth || 1);
+        this.uiManager.host.style.setProperty('--ui-viewport-height', `${Math.round(height)}px`);
+        this.uiManager.host.style.setProperty('--ui-viewport-width', `${Math.round(width)}px`);
+    },
+
+    resizeChatInput(input) {
+        if (!input) return;
+        let maxHeight = this.chatInputMaxHeights?.get(input);
+        if (!Number.isFinite(maxHeight)) {
+            const computedMaxHeight = typeof getComputedStyle === 'function'
+                ? Number.parseFloat(getComputedStyle(input).maxHeight)
+                : Number.NaN;
+            maxHeight = Number.isFinite(computedMaxHeight) ? computedMaxHeight : 140;
+            this.chatInputMaxHeights?.set(input, maxHeight);
+        }
+        input.style.height = 'auto';
+        input.style.height = `${Math.min(input.scrollHeight, maxHeight)}px`;
+    },
+
+    scheduleChatInputResize(input) {
+        this.chatInputResizeTarget = input;
+        if (this.chatInputResizeFrameId) return;
+        this.chatInputResizeFrameId = this.requestManagedFrame(() => {
+            this.chatInputResizeFrameId = null;
+            const target = this.chatInputResizeTarget;
+            this.chatInputResizeTarget = null;
+            this.resizeChatInput(target);
+        });
+    },
+
     scheduleSummaryRender(resultBox, getText) {
         const task = this.summaryRenderTask || {};
         task.resultBox = resultBox;
@@ -193,6 +271,7 @@ export const style1Lifecycle = {
         this.summaryRenderTask = task;
         if (task.timerId || task.frameId) return;
 
+        const delay = this.getStreamingRenderDelay(task.getText());
         task.timerId = this.setManagedTimeout(() => {
             task.timerId = null;
             task.frameId = this.requestManagedFrame(() => {
@@ -200,7 +279,7 @@ export const style1Lifecycle = {
                 if (this.summaryRenderTask !== task) return;
                 this.updateResultBox(task.resultBox, task.getText(), true);
             });
-        }, this.streamingRenderDelayMs);
+        }, delay);
     },
 
     cancelSummaryRender() {
@@ -222,15 +301,22 @@ export const style1Lifecycle = {
         task.getText = getText;
         if (task.timerId || task.frameId) return;
 
+        const delay = this.getStreamingRenderDelay(task.getText());
         task.timerId = this.setManagedTimeout(() => {
             task.timerId = null;
             task.frameId = this.requestManagedFrame(() => {
                 task.frameId = null;
                 if (this.bubbleRenderTasks?.get(key) !== task) return;
-                this.updateBubble(task.bubbleDiv, task.getText(), true);
-                this.scrollToBottom();
+                try {
+                    this.updateBubble(task.bubbleDiv, task.getText(), true);
+                    this.scrollToBottom();
+                } finally {
+                    if (this.bubbleRenderTasks?.get(key) === task) {
+                        this.bubbleRenderTasks.delete(key);
+                    }
+                }
             });
-        }, this.streamingRenderDelayMs);
+        }, delay);
     },
 
     cancelBubbleRender(messageId) {

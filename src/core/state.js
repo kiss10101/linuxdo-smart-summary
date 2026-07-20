@@ -14,6 +14,12 @@ export const coreState = {
         fallbackConcurrency: 1,
         fallbackBatchDelayMs: 600
     },
+    offlineImageExportPolicy: {
+        maxImageBytes: 8 * 1024 * 1024,
+        maxTotalDataUrlBytes: 32 * 1024 * 1024,
+        dataUrlOverheadBytes: 128,
+        requestTimeoutMs: 15_000
+    },
     dialogueCachePolicy: {
         ttlMs: 10 * 60 * 1000,
         maxAgeMs: 15 * 60 * 1000,
@@ -28,16 +34,20 @@ export const coreState = {
     htmlParser: null,
     topicDataCachePolicy: {
         ttlMs: 60 * 1000,
-        maxTopics: 5
+        maxTopics: 5,
+        maxTotalBytes: 32 * 1024 * 1024,
+        maxEntryBytes: 12 * 1024 * 1024
     },
     topicDataPrewarmPolicy: {
         throttleMs: 60 * 1000,
         routeDelayMs: 900,
         resumeDelayMs: 250,
         recentConfirmedMs: 5 * 1000,
-        optimisticMaxAgeMs: 10 * 60 * 1000
+        optimisticMaxAgeMs: 10 * 60 * 1000,
+        maxEntries: 12
     },
     topicDataCache: new Map(),
     topicDataInflight: new Map(),
+    topicDataCacheGeneration: 0,
     topicDataPrewarmState: new Map(),
 };

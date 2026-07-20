@@ -1,6 +1,6 @@
 {
   "name": "linuxdo-smart-summary",
-  "version": "7.8.0-alpha.4",
+  "version": "7.8.0-beta.1",
   "private": true,
   "type": "module",
   "description": "Modular source and deterministic userscript build for Linux.do Smart Summary.",

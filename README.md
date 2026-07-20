@@ -11,14 +11,14 @@
 
 <p align="center">
   <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases/download/v7.6.1/linuxdo-smart-summary-7.6.1.user.js">Install stable 7.6.1</a> ·
-  <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases/download/v7.8.0-alpha.4/linuxdo-smart-summary-7.8.0-alpha.4.user.js">Preview 7.8.0-alpha.4</a> ·
+  <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases/download/v7.8.0-beta.1/linuxdo-smart-summary-7.8.0-beta.1.user.js">Preview 7.8.0-beta.1</a> ·
   <a href="https://github.com/kiss10101/linuxdo-smart-summary/releases">Releases</a> ·
   <a href="./CHANGELOG.md">Changelog</a>
 </p>
 
 <p align="center">
   <img alt="stable" src="https://img.shields.io/badge/stable-7.6.1-2563eb">
-  <img alt="preview" src="https://img.shields.io/badge/preview-7.8.0--alpha.4-f59e0b">
+  <img alt="preview" src="https://img.shields.io/badge/preview-7.8.0--beta.1-f59e0b">
   <img alt="platform" src="https://img.shields.io/badge/platform-linux.do-16a34a">
   <img alt="license" src="https://img.shields.io/badge/license-MIT-64748b">
 </p>
@@ -39,7 +39,7 @@ and `tests/`.
 | Channel | Version | Use when | Notes |
 | --- | --- | --- | --- |
 | Stable | `7.6.1` | You want the safest install target | Repackages the verified `7.6` runtime with pinned marked/DOMPurify dependencies and privacy-clean public fixtures |
-| Preview | `7.8.0-alpha.4` | You want the SPA workspace-lifecycle fix before beta | Preserves the active summary and conversation across direct topic navigation, identifies their source topic, confirms cross-topic replacement, and keeps in-flight work bound to its source |
+| Preview | `7.8.0-beta.1` | You want the complete 7.8 feature set with compatibility and resource-use closure | Keeps the alpha feature set while reducing streaming work, bounding transient caches and offline-image export, and tightening browser lifecycle behavior |
 
 Release line:
 
@@ -48,10 +48,10 @@ Release line:
 ```
 
 GitHub marks the latest non-prerelease as `Latest`; stable `7.6.1` remains the
-default install target while `7.8.0-alpha.4` is the current prerelease preview.
-`alpha.4` is an explicitly approved, bounded lifecycle-fix exception after the
-final `alpha.3` feature gate. After it, `beta.1` is compatibility/defect-only and
-`7.8.0` is the stable promotion; no further feature alpha is planned.
+default install target while `7.8.0-beta.1` is the current prerelease preview.
+The beta closes compatibility, defect, and resource-use risks after the completed
+alpha feature line. `7.8.0` is the next planned release and stable promotion; no
+additional prerelease feature work is planned.
 Historical `7.7` entries remain in the changelog for auditability, not as
 additional migration stops.
 
@@ -62,7 +62,7 @@ additional migration stops.
 | Floor range mapping | Uses `post.post_number`; range shortcuts can prefill from cached topic metadata but still confirm all/recent with no-store topic `highest_post_number` |
 | Linux.do request cadence | Fetches posts in serial `posts.json` batches |
 | Large range guard | Stops oversized summary/export ranges before unbounded `posts.json` batch growth |
-| Runtime scheduling | Coalesces streaming Markdown renders and throttles high-frequency drag/scroll handlers |
+| Runtime scheduling | Streams escaped plain-text previews, renders final Markdown once, adapts update cadence for long output, and coalesces high-frequency scroll/resize work |
 | Topic-page bootstrap | Creates the sidebar only on Linux.do topic routes, with a lightweight SPA route watcher elsewhere |
 | SPA workspace lifetime | Preserves one in-memory summary/chat workspace across direct topic-to-topic navigation, identifies its source topic, confirms replacement on a different topic, and tears it down when leaving topic routes |
 | AI retry path | Reuses current-tab summary text after AI empty/error responses |
@@ -81,7 +81,7 @@ additional migration stops.
 | Post timestamps | Preserves each main post and reply `created_at` value in summary/follow-up AI context as ISO 8601 UTC; HTML and AI-text exports continue to include post times |
 | Boosts | Reads boosts from existing Discourse JSON payloads |
 | Summary coverage | Shows requested range, true topic upper bound, visible post count, cache status, and look-behind status |
-| Export | Exports the explicitly fetched post set as HTML or AI-readable text |
+| Export | Exports the explicitly fetched post set as HTML or AI-readable text; offline image embedding is cancellable and bounded by per-image, aggregate encoded-size, and timeout limits |
 | Model picker | Disables both fetch controls only while its provider request is active; close, timeout (15 seconds), success, failure, and UI teardown all cancel or restore the controls |
 | API profiles | Clickable profile cards switch immediately and persist edits/add/copy/delete actions |
 
@@ -141,9 +141,9 @@ source, behavior, architecture, privacy, and release check:
 npm ci
 npm run build
 npm run verify
-node --check "dist/Linux.do 智能总结-7.8.0-alpha.4.user.js"
-node tools/verify-release.mjs 7.8.0-alpha.4
-node tools/check-all.mjs 7.8.0-alpha.4
+node --check "dist/Linux.do 智能总结-7.8.0-beta.1.user.js"
+node tools/verify-release.mjs 7.8.0-beta.1
+node tools/check-all.mjs 7.8.0-beta.1
 ```
 
 `dist/` is generated. Make changes in `src/`, run `npm run build`, and commit the
@@ -155,8 +155,8 @@ the generated file is stale or nondeterministic.
 GitHub Releases are published by `.github/workflows/release.yml`.
 
 - Pull requests and `master` pushes run the read-only `CI` workflow.
-- Push a new tag like `v7.8.0-alpha.4` to trigger an automatic release.
-- Use the manual `Release` workflow with input `7.8.0-alpha.4` to publish or repair an existing tag release.
+- Push a new tag like `v7.8.0-beta.1` to trigger an automatic release.
+- Use the manual `Release` workflow with input `7.8.0-beta.1` to publish or repair an existing tag release.
 - A normal `master` push does not publish a release; the release job is tag/manual only.
 - The workflow installs from `package-lock.json`, rebuilds `dist/`, rejects generated drift, runs the complete verification suite, and uploads the manifest-selected asset with GitHub Actions' `GITHUB_TOKEN`.
 

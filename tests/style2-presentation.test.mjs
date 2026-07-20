@@ -17,10 +17,11 @@ test('Style2 uses the independent warm-neutral and steel-blue presentation modul
 });
 
 test('Style2 preserves attached desktop layout and switches to a narrow overlay', () => {
-  assert.match(style2Source, /isNarrowViewport\(\)\s*\{[\s\S]*window\.innerWidth <= 700/);
+  assert.match(style2Source, /isNarrowViewport\(\)\s*\{[\s\S]*window\.visualViewport\?\.width/);
+  assert.match(style2Source, /Math\.min\(window\.innerWidth, visualWidth\) <= 700/);
   assert.match(style2Source, /body\.style\.marginLeft = ''/);
   assert.match(style2Source, /getEffectiveSidebarWidth\(\)/);
-  assert.match(presentationSource, /:host\(\.narrow-viewport\) \.sidebar-panel\s*\{[^}]*width:\s*100vw/);
+  assert.match(presentationSource, /:host\(\.narrow-viewport\) \.sidebar-panel\s*\{[^}]*width:\s*min\(100vw,\s*var\(--ui-viewport-width,\s*100vw\)\)/);
   assert.match(presentationSource, /:host\(\.narrow-viewport\) \.resize-handle\s*\{\s*display:\s*none/);
   assert.match(presentationSource, /@media \(max-width:\s*700px\)/);
   assert.match(presentationSource, /@media \(prefers-reduced-motion:\s*reduce\)/);
@@ -34,7 +35,7 @@ test('Style2 renders semantic tabs, sidebar controls, and accessible touch targe
   assert.match(style2Source, /syncTabAccessibility\(tabName\)/);
   assert.match(style2Source, /restoreState\(\)[\s\S]*this\.switchTab\(this\.currentTab \|\| 'summary'\);/);
   assert.doesNotMatch(style2Source, /restoreState\(\)[\s\S]*this\.syncTabAccessibility\(this\.currentTab\);/);
-  assert.match(style2Source, /\['ArrowLeft', 'ArrowRight', 'Home', 'End'\]/);
+  assert.doesNotMatch(style2Source, /addManagedListener\(tabBar, 'keydown'/);
   assert.match(presentationSource, /\.message-menu-item\s*\{[^}]*min-height:\s*40px/);
   assert.match(presentationSource, /\.summary-selection-item\s*\{[^}]*min-height:\s*40px/);
   assert.match(presentationSource, /\.send-btn\s*\{[^}]*width:\s*44px;[^}]*height:\s*44px/);

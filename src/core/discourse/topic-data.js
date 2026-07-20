@@ -15,6 +15,7 @@ export const topicDataCore = {
         if (csrf) headers['x-csrf-token'] = csrf;
         const fetchOptions = { headers, credentials: 'same-origin' };
         if (options.noStore) fetchOptions.cache = 'no-store';
+        if (options.signal) fetchOptions.signal = options.signal;
         return fetchOptions;
     },
 
@@ -42,6 +43,37 @@ export const topicDataCore = {
 
     normalizeTopicId(topicId) {
         return String(topicId || '').trim();
+    },
+
+    estimateJsonSize(value) {
+        try {
+            const json = JSON.stringify(value);
+            if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(json).byteLength;
+            return json.length * 2;
+        } catch {
+            return Number.POSITIVE_INFINITY;
+        }
+    },
+
+    trimTopicDataCache() {
+        const policy = this.topicDataCachePolicy;
+        let totalBytes = 0;
+        for (const entry of this.topicDataCache.values()) totalBytes += Number(entry.approxSize) || 0;
+        while (this.topicDataCache.size > policy.maxTopics || totalBytes > policy.maxTotalBytes) {
+            const oldestKey = this.topicDataCache.keys().next().value;
+            if (oldestKey === undefined) break;
+            totalBytes -= Number(this.topicDataCache.get(oldestKey)?.approxSize) || 0;
+            this.topicDataCache.delete(oldestKey);
+        }
+    },
+
+    trimTopicDataPrewarmState() {
+        const limit = Math.max(1, Number(this.topicDataPrewarmPolicy.maxEntries) || 1);
+        while (this.topicDataPrewarmState.size > limit) {
+            const oldestKey = this.topicDataPrewarmState.keys().next().value;
+            if (oldestKey === undefined) break;
+            this.topicDataPrewarmState.delete(oldestKey);
+        }
     },
 
     getTopicDataCacheEntry(topicId, options = {}) {
@@ -101,23 +133,38 @@ export const topicDataCore = {
         const now = Date.now();
         const confirmed = meta.confirmed === true;
 
+        const approxSize = this.estimateJsonSize(topicData);
+        if (!Number.isFinite(approxSize) || approxSize > this.topicDataCachePolicy.maxEntryBytes) {
+            return topicData;
+        }
+
+        const confirmedTopicData = confirmed ? topicData : (previous?.confirmedTopicData || null);
+        const confirmedApproxSize = confirmed
+            ? approxSize
+            : (Number(previous?.confirmedApproxSize)
+                || (previous?.confirmedTopicData === previous?.topicData ? Number(previous?.approxSize) || 0 : 0));
+        const retainedSize = approxSize + (
+            confirmedTopicData && confirmedTopicData !== topicData ? confirmedApproxSize : 0
+        );
+        if (retainedSize > this.topicDataCachePolicy.maxEntryBytes) return topicData;
+
         this.topicDataCache.set(key, {
             createdAt: now,
             requestStartedAt: Number(meta.requestStartedAt) || now,
+            approxSize: retainedSize,
             topicData,
             confirmedAt: confirmed ? now : (previous?.confirmedAt || 0),
-            confirmedTopicData: confirmed ? topicData : (previous?.confirmedTopicData || null)
+            confirmedTopicData,
+            confirmedApproxSize
         });
 
-        while (this.topicDataCache.size > this.topicDataCachePolicy.maxTopics) {
-            const oldestKey = this.topicDataCache.keys().next().value;
-            this.topicDataCache.delete(oldestKey);
-        }
+        this.trimTopicDataCache();
 
         return topicData;
     },
 
     clearTopicDataCache(topicId = null) {
+        this.topicDataCacheGeneration = (this.topicDataCacheGeneration || 0) + 1;
         const key = this.normalizeTopicId(topicId);
         if (key) {
             this.topicDataCache.delete(key);
@@ -136,38 +183,46 @@ export const topicDataCore = {
         const key = this.normalizeTopicId(topicId);
         if (!key) throw new Error('未检测到帖子ID');
         const forceRefresh = options.forceRefresh === true;
+        const requestSignal = opts?.signal;
+        const shareInflight = !requestSignal;
+        this.throwIfAborted?.(requestSignal);
 
         if (!forceRefresh) {
             const cached = this.getCachedTopicData(key);
             if (cached) return { topicData: cached, cacheHit: true };
 
             const forceInflightKey = `${key}:force`;
-            if (this.topicDataInflight.has(forceInflightKey)) {
+            if (shareInflight && this.topicDataInflight.has(forceInflightKey)) {
                 return this.topicDataInflight.get(forceInflightKey);
             }
         }
 
         const inflightKey = `${key}:${forceRefresh ? 'force' : 'normal'}`;
-        if (this.topicDataInflight.has(inflightKey)) {
+        if (shareInflight && this.topicDataInflight.has(inflightKey)) {
             return this.topicDataInflight.get(inflightKey);
         }
 
         const requestStartedAt = Date.now();
+        const cacheGeneration = this.topicDataCacheGeneration || 0;
         const fetchOptions = forceRefresh
             ? { ...opts, cache: 'no-store' }
             : opts;
         const request = this.fetchLinuxDoJson(`https://linux.do/t/-/${key}.json`, fetchOptions)
             .then((topicData) => {
-                this.setCachedTopicData(key, topicData, {
-                    confirmed: forceRefresh,
-                    requestStartedAt
-                });
+                if (cacheGeneration === (this.topicDataCacheGeneration || 0)) {
+                    this.setCachedTopicData(key, topicData, {
+                        confirmed: forceRefresh,
+                        requestStartedAt
+                    });
+                }
                 return { topicData, cacheHit: false, confirmed: forceRefresh };
             })
             .finally(() => {
-                this.topicDataInflight.delete(inflightKey);
+                if (shareInflight && this.topicDataInflight.get(inflightKey) === request) {
+                    this.topicDataInflight.delete(inflightKey);
+                }
             });
-        this.topicDataInflight.set(inflightKey, request);
+        if (shareInflight) this.topicDataInflight.set(inflightKey, request);
         return request;
     },
 
@@ -190,18 +245,24 @@ export const topicDataCore = {
 
         state.lastAttemptAt = now;
         state.reason = options.reason || 'prewarm';
+        this.topicDataPrewarmState.delete(key);
         this.topicDataPrewarmState.set(key, state);
+        this.trimTopicDataPrewarmState();
 
         try {
             const result = await this.fetchTopicData(key, this.getLinuxDoFetchOptions({ noStore: true }), {
                 forceRefresh: true
             });
             state.lastSuccessAt = Date.now();
+            this.topicDataPrewarmState.delete(key);
             this.topicDataPrewarmState.set(key, state);
+            this.trimTopicDataPrewarmState();
             return result;
         } catch (error) {
             state.lastErrorAt = Date.now();
+            this.topicDataPrewarmState.delete(key);
             this.topicDataPrewarmState.set(key, state);
+            this.trimTopicDataPrewarmState();
             throw error;
         }
     },
@@ -463,6 +524,8 @@ export const topicDataCore = {
     },
 
     async fetchPostsByIds(topicId, postIds, opts, onProgress, policyOverride = {}, progressMeta = {}) {
+        const signal = opts?.signal;
+        this.throwIfAborted?.(signal);
         const ids = [...new Set(postIds.filter(Boolean))];
         if (ids.length === 0) return [];
 
@@ -484,6 +547,7 @@ export const topicDataCore = {
         let nextBatchStartAt = 0;
 
         const waitForBatchSlot = async () => {
+            this.throwIfAborted?.(signal);
             if (policy.batchDelayMs <= 0) return;
 
             const now = Date.now();
@@ -491,15 +555,18 @@ export const topicDataCore = {
             nextBatchStartAt = Math.max(now, nextBatchStartAt) + policy.batchDelayMs;
             if (waitMs > 0) {
                 await this.sleep(waitMs);
+                this.throwIfAborted?.(signal);
             }
         };
 
         const runWorker = async () => {
             while (cursor < chunks.length) {
+                this.throwIfAborted?.(signal);
                 const index = cursor++;
                 await waitForBatchSlot();
 
                 const chunk = chunks[index];
+                this.throwIfAborted?.(signal);
                 const q = chunk.map(id => `post_ids[]=${encodeURIComponent(id)}`).join('&');
                 const data = await this.fetchLinuxDoJson(`https://linux.do/t/${topicId}/posts.json?${q}&include_suggested=false`, opts);
                 results[index] = data.post_stream?.posts || [];

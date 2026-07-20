@@ -566,3 +566,92 @@ test('a stale request finalizer cannot clear a newer active request', () => {
     assert.equal(context.activeChatRequest, newRequest);
     assert.equal(context.isCurrentChatRequest(newRequest), true);
 });
+
+test('stream chunks update one bubble without rebuilding history or rescanning the DOM', async (t) => {
+    const originalStreamChat = Core.streamChat;
+    t.after(() => {
+        Core.streamChat = originalStreamChat;
+    });
+
+    const user = message('u1', 'user', '问题', { excludeFromApi: true });
+    const context = createHarness([user]);
+    context.chatSession.baseMessages = [{ role: 'system', content: 'system' }];
+    const bubble = { isConnected: true };
+    let historySyncCount = 0;
+    let bubbleLookupCount = 0;
+    let scheduledBubbleCount = 0;
+    context.syncLegacyChatHistory = () => {
+        historySyncCount += 1;
+    };
+    context.getBubbleElement = () => {
+        bubbleLookupCount += 1;
+        return bubble;
+    };
+    context.scheduleBubbleRender = (_messageId, targetBubble) => {
+        assert.equal(targetBubble, bubble);
+        scheduledBubbleCount += 1;
+    };
+    context.updateBubble = () => {};
+    context.scrollToBottom = () => {};
+
+    Core.streamChat = async (_messages, onEvent, onDone) => {
+        const syncBeforeChunks = historySyncCount;
+        const lookupsBeforeChunks = bubbleLookupCount;
+        onEvent({ type: 'content_delta', text: '第一段' });
+        onEvent({ type: 'content_delta', text: '第二段' });
+        assert.equal(historySyncCount, syncBeforeChunks);
+        assert.equal(bubbleLookupCount, lookupsBeforeChunks);
+        onDone({ finishReason: 'stop' });
+    };
+
+    await context.requestAssistantForUser(user);
+
+    assert.equal(scheduledBubbleCount, 2);
+    assert.equal(bubbleLookupCount, 1);
+    assert.equal(context.findVisibleMessage(user.id).excludeFromApi, false);
+    const assistant = context.chatSession.visibleMessages.at(-1);
+    assert.equal(assistant.status, 'done');
+    assert.equal(assistant.content, '第一段第二段');
+});
+
+test('rendering chat history requests one scroll after all bubbles', () => {
+    const list = { innerHTML: '' };
+    const empty = { classList: { add() {}, remove() {} } };
+    const calls = { bubbles: [], scrolls: 0 };
+    const context = {
+        ...style1Interactions,
+        chatSession: {
+            visibleMessages: [
+                message('u1', 'user', '问题一'),
+                message('a1', 'assistant', '回答一'),
+                message('u2', 'user', '问题二')
+            ]
+        },
+        uiManager: {
+            Q(selector) {
+                if (selector === '#chat-list') return list;
+                if (selector === '#chat-empty') return empty;
+                return null;
+            }
+        },
+        closeSummarySelectionMenu() {},
+        addBubble(...args) {
+            calls.bubbles.push(args);
+        },
+        scrollToBottom() {
+            calls.scrolls += 1;
+        },
+        updateMessageCount() {},
+        updateScrollButtons() {}
+    };
+
+    context.renderChatMessages();
+
+    assert.equal(calls.bubbles.length, 3);
+    assert.ok(calls.bubbles.every(([, , options]) => options?.scroll === false));
+    assert.equal(calls.scrolls, 1);
+
+    context.chatSession.visibleMessages = [];
+    context.renderChatMessages();
+    assert.equal(calls.scrolls, 1);
+});

@@ -217,6 +217,27 @@ Recommended repository settings are:
 
 ## Change History
 
+### 2026-07-20 - Beta compatibility and resource closure
+
+**Change**: Promoted the completed 7.8 alpha feature line to beta.1 with lightweight
+streaming previews, adaptive render scheduling, direct active-message updates, browser
+lifecycle compatibility fixes, bounded transient caches, and cancellable offline image
+embedding with explicit byte and timeout budgets.
+
+**Reason**: Long streaming answers and large offline exports could repeatedly rebuild or
+retain more data than necessary, while IME, visual viewport, modal focus, and teardown paths
+needed explicit cross-browser lifecycle contracts before stable promotion.
+
+**Impact**: Rendering and scroll scheduling, shared input sizing, focus containment and
+restoration, request cancellation, topic/prewarm cache accounting, offline image conversion,
+targeted lifecycle/resource tests, release metadata, and the generated beta asset. Stored
+settings, provider schemas, Linux.do post-fetch cadence, public runtime APIs, and the completed
+alpha feature set remain unchanged.
+
+**Decision**: Keep beta.1 compatibility/defect-only. Use bounded data structures and existing
+browser primitives instead of adding a framework, worker, or new dependency; after beta
+acceptance, promote the same feature set to stable 7.8.0.
+
 ### 2026-07-17 - SPA workspace lifecycle correction
 
 **Change**: Added alpha.4 to preserve the current summary and conversation across Linux.do

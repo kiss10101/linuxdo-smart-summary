@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "7.8.0-alpha.4",
+    [string]$Version = "7.8.0-beta.1",
     [switch]$All,
     [switch]$SkipVerify
 )
@@ -8,6 +8,22 @@ $ErrorActionPreference = "Stop"
 
 $repo = "kiss10101/linuxdo-smart-summary"
 $releases = @(
+    @{
+        Tag          = "v7.8.0-beta.1"
+        Name         = "v7.8.0-beta.1"
+        AssetPattern = "*7.8.0-beta.1.user.js"
+        AssetName    = "linuxdo-smart-summary-7.8.0-beta.1.user.js"
+        Prerelease   = $true
+        Body         = @"
+7.8.0-beta.1 compatibility and resource-use closure preview.
+
+- Keeps the completed 7.8 alpha feature set without adding settings, provider schemas, or background Linux.do requests.
+- Reduces streaming work with lightweight previews, adaptive render cadence, direct active-message updates, and coalesced scrolling.
+- Tightens IME, visual-viewport, model-picker focus, and teardown behavior across browser lifecycle paths.
+- Bounds topic caches and offline image embedding by count, bytes, timeout, and cancellation while preserving remote URLs when an image cannot be embedded.
+- Adds focused lifecycle, abort-race, resource-budget, accessibility, build, and release regression coverage.
+"@
+    },
     @{
         Tag          = "v7.8.0-alpha.4"
         Name         = "v7.8.0-alpha.4"

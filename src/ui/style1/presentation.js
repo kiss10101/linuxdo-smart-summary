@@ -40,7 +40,7 @@ export const style1Presentation = {
         --text-main: #f5f0eb; --text-sec: #b8a99d; --text-muted: #7a6d64;
     }
     * { box-sizing: border-box; }
-    .sidebar-panel { position: fixed; top: 0; bottom: 0; width: var(--sidebar-width); background: var(--bg-glass-dark); backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%); box-shadow: var(--shadow-xl); z-index: 9998; display: flex; flex-direction: column; transition: transform var(--transition-slow); border: 1px solid var(--border-light); }
+    .sidebar-panel { position: fixed; top: 0; bottom: auto; width: var(--sidebar-width); height: var(--ui-viewport-height, 100vh); max-height: 100vh; background: var(--bg-glass-dark); backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%); box-shadow: var(--shadow-xl); z-index: 9998; display: flex; flex-direction: column; transition: transform var(--transition-slow); border: 1px solid var(--border-light); }
     .panel-left { left: 0; border-left: none; border-radius: 0 var(--radius-xl) var(--radius-xl) 0; transform: translateX(-100%); }
     .panel-left.open { transform: translateX(0); }
     .panel-right { right: 0; border-right: none; border-radius: var(--radius-xl) 0 0 var(--radius-xl); transform: translateX(100%); }
@@ -104,7 +104,7 @@ export const style1Presentation = {
     .btn-xs:disabled, .btn-xs.loading { opacity: 0.62; cursor: wait; transform: none; }
     .workspace-source-status { margin-top: 12px; padding: 10px 12px; color: var(--text-sec); background: var(--bg-hover); border: 1px solid var(--border-light); border-radius: var(--radius-sm); font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
     .summary-result-wrapper { position: relative; }
-    .result-box { margin-top: 20px; padding: 24px 24px 24px 28px; background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--radius-lg); font-size: 14px; line-height: 1.8; color: var(--text-main); min-height: 180px; max-height: calc(100vh - 380px); overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable; word-break: break-word; box-shadow: var(--shadow-sm); position: relative; direction: rtl; text-align: start; }
+    .result-box { margin-top: 20px; padding: 24px 24px 24px 28px; background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--radius-lg); font-size: 14px; line-height: 1.8; color: var(--text-main); min-height: 180px; max-height: calc(var(--ui-viewport-height, 100vh) - 380px); overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable; word-break: break-word; box-shadow: var(--shadow-sm); position: relative; direction: rtl; text-align: start; }
     .result-box > * { direction: ltr; unicode-bidi: isolate; }
     .result-box.empty { display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 13px; text-align: center; background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-base) 100%); }
     .summary-coverage { margin-top: 18px; padding: 14px 16px; border: 1px solid var(--border-light); border-radius: var(--radius-md); background: var(--bg-hover); color: var(--text-sec); font-size: 12px; line-height: 1.6; }
@@ -288,7 +288,7 @@ export const style1Presentation = {
     .model-fetch-btn { flex: 0 0 auto; padding: 0 14px; height: 48px; }
     .model-picker-overlay, .workspace-replace-overlay { position: absolute; inset: 0; z-index: 10002; display: none; align-items: center; justify-content: center; padding: 22px; background: rgba(45, 37, 32, 0.42); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
     .model-picker-overlay.show, .workspace-replace-overlay.show { display: flex; }
-    .model-picker-dialog, .workspace-replace-dialog { width: 100%; max-width: 380px; max-height: 72vh; display: flex; flex-direction: column; background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--radius-lg); box-shadow: var(--shadow-xl); overflow: hidden; }
+    .model-picker-dialog, .workspace-replace-dialog { width: 100%; max-width: 380px; max-height: min(72vh, calc(var(--ui-viewport-height, 100vh) - 44px)); display: flex; flex-direction: column; background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--radius-lg); box-shadow: var(--shadow-xl); overflow: hidden; }
     .model-picker-header, .workspace-replace-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px; border-bottom: 1px solid var(--border-light); }
     .model-picker-title, .workspace-replace-title { font-size: 14px; font-weight: 700; color: var(--text-main); }
     .model-picker-status { padding: 12px 18px; color: var(--text-sec); font-size: 12px; line-height: 1.5; border-bottom: 1px solid var(--border-light); }
@@ -488,7 +488,7 @@ export const style1Presentation = {
                             </div>
                             <div class="chat-input-area">
                                 <div class="chat-input-row">
-                                    <textarea id="chat-input" class="chat-input" placeholder="输入你的问题... (Enter 发送)" rows="1"></textarea>
+                                    <textarea id="chat-input" class="chat-input" placeholder="输入你的问题... (Enter 发送)" enterkeyhint="send" rows="1"></textarea>
                                     <button class="send-btn" id="btn-send" title="发送消息">${sendIcon}</button>
                                 </div>
                             </div>

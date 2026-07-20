@@ -287,7 +287,7 @@ export const style1Helpers = {
         }
     },
 
-    addBubble(messageOrRole, text) {
+    addBubble(messageOrRole, text, { scroll = true } = {}) {
         const Q = this.uiManager.Q.bind(this.uiManager);
         const message = typeof messageOrRole === 'object'
             ? messageOrRole
@@ -295,7 +295,7 @@ export const style1Helpers = {
         const div = document.createElement('div');
         this.renderBubbleContent(div, message);
         Q('#chat-list').appendChild(div);
-        this.scrollToBottom();
+        if (scroll) this.scrollToBottom();
         return div;
     },
 
@@ -332,17 +332,30 @@ export const style1Helpers = {
         this.closeMessageContextMenu?.();
         this.closeSummarySelectionMenu?.();
         const modal = Q('#model-picker-modal');
+        const activeElement = modal?.getRootNode?.().activeElement;
+        this.modelPickerReturnFocus = activeElement?.isConnected
+            ? activeElement
+            : Q('#btn-fetch-models');
         modal.classList.add('show');
         modal.setAttribute('aria-hidden', 'false');
+        this.requestManagedFrame(() => {
+            if (!modal.classList.contains('show')) return;
+            const firstControl = modal.querySelector('button:not([disabled]), [tabindex]:not([tabindex="-1"])');
+            firstControl?.focus();
+        });
         this.loadModelList();
     },
 
-    closeModelPicker() {
+    closeModelPicker({ restoreFocus = true } = {}) {
         this.cancelModelListRequest();
         const modal = this.uiManager.Q('#model-picker-modal');
-        if (!modal) return;
-        modal.classList.remove('show');
-        modal.setAttribute('aria-hidden', 'true');
+        if (modal) {
+            modal.classList.remove('show');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+        const returnFocus = this.modelPickerReturnFocus;
+        this.modelPickerReturnFocus = null;
+        if (restoreFocus && returnFocus?.isConnected) returnFocus.focus();
     },
 
     setModelListLoading(isLoading) {
@@ -479,12 +492,27 @@ export const style1Helpers = {
 
     scrollToBottom(force = false) {
         if (!force && (!GM_getValue('autoScroll', true) || this.userScrolledUp)) return this.updateScrollButtons();
-        const el = this.uiManager.Q('#chat-messages');
-        this.isProgrammaticScroll = true;
-        this.setManagedTimeout(() => {
+        this.chatScrollForce = this.chatScrollForce || force;
+        if (this.chatScrollFrameId) return;
+        this.chatScrollFrameId = this.requestManagedFrame(() => {
+            this.chatScrollFrameId = null;
+            const shouldForce = this.chatScrollForce;
+            this.chatScrollForce = false;
+            if (!shouldForce && (!GM_getValue('autoScroll', true) || this.userScrolledUp)) {
+                this.updateScrollButtons();
+                return;
+            }
+            const el = this.uiManager?.Q('#chat-messages');
+            if (!el) return;
+            this.isProgrammaticScroll = true;
             el.scrollTop = el.scrollHeight;
-            this.setManagedTimeout(() => { this.isProgrammaticScroll = false; this.updateScrollButtons(); }, 50);
-        }, 0);
+            this.clearManagedTimeout(this.chatScrollResetTimerId);
+            this.chatScrollResetTimerId = this.setManagedTimeout(() => {
+                this.chatScrollResetTimerId = null;
+                this.isProgrammaticScroll = false;
+                this.updateScrollButtons();
+            }, 50);
+        });
     },
 
     forceScrollToBottom() {
@@ -496,16 +524,27 @@ export const style1Helpers = {
         if (!force && (!GM_getValue('autoScroll', true) || this.summaryUserScrolledUp)) {
             return this.updateSummaryScrollButton();
         }
-        const el = this.uiManager.Q('#summary-result');
-        if (!el) return;
-        this.isSummaryProgrammaticScroll = true;
-        this.setManagedTimeout(() => {
+        this.summaryScrollForce = this.summaryScrollForce || force;
+        if (this.summaryScrollFrameId) return;
+        this.summaryScrollFrameId = this.requestManagedFrame(() => {
+            this.summaryScrollFrameId = null;
+            const shouldForce = this.summaryScrollForce;
+            this.summaryScrollForce = false;
+            if (!shouldForce && (!GM_getValue('autoScroll', true) || this.summaryUserScrolledUp)) {
+                this.updateSummaryScrollButton();
+                return;
+            }
+            const el = this.uiManager?.Q('#summary-result');
+            if (!el) return;
+            this.isSummaryProgrammaticScroll = true;
             el.scrollTop = el.scrollHeight;
-            this.setManagedTimeout(() => {
+            this.clearManagedTimeout(this.summaryScrollResetTimerId);
+            this.summaryScrollResetTimerId = this.setManagedTimeout(() => {
+                this.summaryScrollResetTimerId = null;
                 this.isSummaryProgrammaticScroll = false;
                 this.updateSummaryScrollButton();
             }, 50);
-        }, 0);
+        });
     },
 
     forceScrollSummaryToBottom() {
@@ -536,6 +575,39 @@ export const style1Helpers = {
         const count = this.chatSession?.visibleMessages?.filter(message => message.role === 'user').length || 0;
         this.userMessageCount = count;
         this.uiManager.Q('#msg-count').textContent = count;
+    },
+
+    beginExportRequest() {
+        this.abortActiveExportRequest('replace');
+        const request = {
+            token: ++this.exportRequestSeq,
+            lifecycleEpoch: this.lifecycleEpoch,
+            controller: new AbortController(),
+            abortReason: ''
+        };
+        this.activeExportRequest = request;
+        return request;
+    },
+
+    isCurrentExportRequest(request) {
+        return Boolean(request
+            && this.activeExportRequest === request
+            && request.token === this.exportRequestSeq
+            && (!request.lifecycleEpoch || this.isCurrentLifecycleEpoch(request.lifecycleEpoch)));
+    },
+
+    abortActiveExportRequest(reason = 'cancel') {
+        const request = this.activeExportRequest;
+        if (!request) return false;
+        request.abortReason = reason;
+        if (!request.controller.signal.aborted) request.controller.abort();
+        return true;
+    },
+
+    finalizeExportRequest(request) {
+        if (this.activeExportRequest !== request) return false;
+        this.activeExportRequest = null;
+        return true;
     },
 
     // 导出功能相关方法
@@ -607,6 +679,8 @@ export const style1Helpers = {
         }
         if (!start || !end || start > end) return this.showToast('楼层范围无效', 'error');
 
+        const request = this.beginExportRequest();
+        const signal = request.controller.signal;
         this.setLoading('#btn-export', true);
         const statusBox = Q('#export-status');
         statusBox.classList.remove('empty');
@@ -614,10 +688,13 @@ export const style1Helpers = {
 
         try {
             const { topicData, posts: allPosts, rangeMapping } = await Core.fetchTopicPosts(tid, start, end, (progress) => {
+                if (!this.isCurrentExportRequest(request)) return;
                 const progressText = Core.escapeHtml(Core.getFetchProgressText(progress, '帖子数据'));
                 statusBox.innerHTML = `<div style="display:flex;align-items:center;gap:10px;"><div class="thinking"><div class="thinking-dot"></div><div class="thinking-dot"></div><div class="thinking-dot"></div></div>${progressText}</div>`;
-            });
+            }, { signal });
 
+            Core.throwIfAborted(signal);
+            if (!this.isCurrentExportRequest(request)) return;
             if (allPosts.length === 0) throw new Error('未获取到可导出的帖子内容');
             const mappingText = rangeMapping?.fallbackUsed
                 ? `，已回看 ${rangeMapping.lookBehindIds} 个索引校准范围`
@@ -626,23 +703,34 @@ export const style1Helpers = {
             statusBox.innerHTML = `<div style="display:flex;align-items:center;gap:10px;"><div class="thinking"><div class="thinking-dot"></div><div class="thinking-dot"></div><div class="thinking-dot"></div></div>${processingText}</div>`;
 
             if (exportType === 'html') {
-                await this.exportAsHtml(topicData, allPosts, statusBox);
+                await this.exportAsHtml(topicData, allPosts, statusBox, request);
             } else {
-                await this.exportAsAiText(topicData, allPosts, statusBox);
+                await this.exportAsAiText(topicData, allPosts, statusBox, request);
             }
-
-            this.setLoading('#btn-export', false);
         } catch (e) {
+            if (signal.aborted || e?.name === 'AbortError') return;
+            if (!this.isCurrentExportRequest(request)) return;
             statusBox.innerHTML = `<div style="color:var(--danger)">❌ 导出失败: ${Core.escapeHtml(e?.message || e)}</div>`;
-            this.setLoading('#btn-export', false);
-            this.showToast('导出失败: ' + e.message, 'error');
+            this.showToast('导出失败: ' + (e?.message || e), 'error');
+        } finally {
+            if (this.finalizeExportRequest(request)) this.setLoading('#btn-export', false);
         }
     },
 
-    async exportAsHtml(topicData, posts, statusBox) {
+    async exportAsHtml(topicData, posts, statusBox, request = this.activeExportRequest) {
         const Q = this.uiManager.Q.bind(this.uiManager);
         const offlineImages = Q('#export-offline-images').checked;
         const theme = Q('#export-theme').value;
+        const signal = request?.controller?.signal;
+        const imagePolicy = Core.offlineImageExportPolicy || {
+            maxImageBytes: 8 * 1024 * 1024,
+            maxTotalDataUrlBytes: 32 * 1024 * 1024,
+            dataUrlOverheadBytes: 128,
+            requestTimeoutMs: 15_000
+        };
+        const imageCache = new Map();
+        let totalDataUrlBytes = 0;
+        let skippedImageResourceCount = 0;
 
         statusBox.innerHTML = `<div style="display:flex;align-items:center;gap:10px;"><div class="thinking"><div class="thinking-dot"></div><div class="thinking-dot"></div><div class="thinking-dot"></div></div>正在生成 HTML...</div>`;
 
@@ -650,9 +738,10 @@ export const style1Helpers = {
         const author = Core.escapeHtml(topicData.details?.created_by?.username || '未知');
         const createTime = new Date(topicData.created_at).toLocaleString('zh-CN');
 
-        let postsHtml = '';
+        const postsHtmlParts = [];
         const postsByPostNumber = Core.createPostsByPostNumber(posts);
         for (const post of posts) {
+            Core.throwIfAborted(signal);
             const userName = Core.escapeHtml(post.name || post.username);
             const username = Core.escapeHtml(post.username);
             const postNumber = Core.escapeHtml(post.post_number);
@@ -665,29 +754,56 @@ export const style1Helpers = {
             if (offlineImages && Core.postHasImage(post)) {
                 statusBox.innerHTML = `<div style="display:flex;align-items:center;gap:10px;"><div class="thinking"><div class="thinking-dot"></div><div class="thinking-dot"></div><div class="thinking-dot"></div></div>正在处理第 ${postNumber} 楼的图片...</div>`;
 
-                const imgRegex = /<img[^>]+src="([^"]+)"[^>]*>/gi;
+                const imgRegex = /(<img\b[^>]*\bsrc\s*=\s*)(["'])([^"']*)\2/gi;
                 const matches = [...content.matchAll(imgRegex)];
 
                 for (const match of matches) {
-                    try {
-                        const imgUrl = Core.absoluteUrl(match[1]);
-                        const response = await fetch(imgUrl);
-                        const blob = await response.blob();
-                        const base64 = await new Promise((resolve) => {
-                            const reader = new FileReader();
-                            reader.onloadend = () => resolve(reader.result);
-                            reader.readAsDataURL(blob);
-                        });
-                        content = content.replace(match[1], base64);
-                    } catch (e) {
-                        console.warn('图片转换失败:', match[1], e);
+                    Core.throwIfAborted(signal);
+                    const imgUrl = Core.absoluteUrl(match[3]);
+                    if (!imgUrl || imgUrl.startsWith('data:')) continue;
+                    if (!imageCache.has(imgUrl)) {
+                        const remainingEncodedBytes = imagePolicy.maxTotalDataUrlBytes - totalDataUrlBytes;
+                        const maxRawBytes = Math.min(
+                            imagePolicy.maxImageBytes,
+                            Math.floor(Math.max(0, remainingEncodedBytes - imagePolicy.dataUrlOverheadBytes) * 3 / 4)
+                        );
+                        if (maxRawBytes <= 0) {
+                            imageCache.set(imgUrl, null);
+                            skippedImageResourceCount += 1;
+                        } else {
+                            try {
+                                const result = await Core.fetchImageAsDataUrl(imgUrl, {
+                                    signal,
+                                    maxBytes: maxRawBytes,
+                                    timeoutMs: imagePolicy.requestTimeoutMs
+                                });
+                                const encodedByteLength = Number(result.encodedByteLength) || result.dataUrl.length;
+                                if (encodedByteLength > remainingEncodedBytes) {
+                                    imageCache.set(imgUrl, null);
+                                    skippedImageResourceCount += 1;
+                                } else {
+                                    totalDataUrlBytes += encodedByteLength;
+                                    imageCache.set(imgUrl, result.dataUrl);
+                                }
+                            } catch (e) {
+                                if (signal?.aborted || e?.name === 'AbortError') throw e;
+                                skippedImageResourceCount += 1;
+                                imageCache.set(imgUrl, null);
+                                console.warn('图片转换失败:', imgUrl, e);
+                            }
+                        }
                     }
                 }
+                content = content.replace(imgRegex, (fullMatch, prefix, quote, source) => {
+                    const imgUrl = Core.absoluteUrl(source);
+                    const dataUrl = imageCache.get(imgUrl);
+                    return dataUrl ? `${prefix}${quote}${dataUrl}${quote}` : fullMatch;
+                });
             }
 
             content = Core.sanitizeExportHtml(content);
 
-            postsHtml += `
+            postsHtmlParts.push(`
                 <div class="post" id="post-${postNumber}">
                     <div class="post-header">
                         <div class="post-author">
@@ -703,8 +819,10 @@ export const style1Helpers = {
                     <div class="post-content">${content}</div>
                     ${boostsHtml}
                 </div>
-            `;
+            `);
         }
+
+        const postsHtml = postsHtmlParts.join('');
 
         const themeColors = theme === 'dark' ? {
             bg: '#1a1a1a',
@@ -775,14 +893,20 @@ export const style1Helpers = {
 </html>`;
 
         const filename = `${Core.sanitizeFilenamePart(topicData.title)}_${posts[0].post_number}-${posts[posts.length-1].post_number}.html`;
+        Core.throwIfAborted(signal);
+        if (request && !this.isCurrentExportRequest(request)) return;
         Core.downloadFile(html, filename, 'text/html');
 
-        statusBox.innerHTML = `<div style="color:var(--success)">✅ HTML 文件已导出！<br><small>文件名: ${Core.escapeHtml(filename)}</small></div>`;
-        this.showToast('HTML 导出成功');
+        const skippedText = skippedImageResourceCount > 0
+            ? `<br><small>${skippedImageResourceCount} 个图片资源因失败或资源预算限制保留远程地址</small>`
+            : '';
+        statusBox.innerHTML = `<div style="color:var(--success)">✅ HTML 文件已导出！<br><small>文件名: ${Core.escapeHtml(filename)}</small>${skippedText}</div>`;
+        this.showToast(skippedImageResourceCount > 0 ? 'HTML 已导出，部分图片保留远程地址' : 'HTML 导出成功');
     },
 
-    async exportAsAiText(topicData, posts, statusBox) {
+    async exportAsAiText(topicData, posts, statusBox, request = this.activeExportRequest) {
         const Q = this.uiManager.Q.bind(this.uiManager);
+        const signal = request?.controller?.signal;
         const includeHeader = Q('#export-ai-header').checked;
         const includeImages = Q('#export-ai-images').checked;
         const includeQuotes = Q('#export-ai-quotes').checked;
@@ -801,6 +925,7 @@ export const style1Helpers = {
 
         const postsByPostNumber = Core.createPostsByPostNumber(posts);
         for (const post of posts) {
+            Core.throwIfAborted(signal);
             const userName = post.name || post.username;
             const username = post.username;
             const postTime = new Date(post.created_at).toLocaleString('zh-CN');
@@ -820,6 +945,8 @@ export const style1Helpers = {
         }
 
         const filename = `${Core.sanitizeFilenamePart(topicData.title)}_${posts[0].post_number}-${posts[posts.length-1].post_number}.txt`;
+        Core.throwIfAborted(signal);
+        if (request && !this.isCurrentExportRequest(request)) return;
         Core.downloadFile(text, filename, 'text/plain');
 
         statusBox.innerHTML = `<div style="color:var(--success)">✅ AI 文本已导出！<br><small>文件名: ${Core.escapeHtml(filename)}</small></div>`;

@@ -36,7 +36,15 @@ UIRegistry.register('style2', {
         this.streamingRenderDelayMs = 80;
         this.summaryRenderTask = null;
         this.bubbleRenderTasks = new Map();
-        this.scrollButtonsFrame = null;
+        this.chatInputResizeFrameId = null;
+        this.chatInputResizeTarget = null;
+        this.chatInputMaxHeights = new WeakMap();
+        this.chatScrollFrameId = null;
+        this.chatScrollResetTimerId = null;
+        this.chatScrollForce = false;
+        this.summaryScrollFrameId = null;
+        this.summaryScrollResetTimerId = null;
+        this.summaryScrollForce = false;
         this.btnPos = GM_getValue(this.getStyleStorageKey('btnPos'), { side: 'right', top: '50%' });
         this.side = this.btnPos.side;
         this.sidebarWidth = GM_getValue(this.getStyleStorageKey('sidebarWidth'), 420);
@@ -61,6 +69,7 @@ UIRegistry.register('style2', {
         this.modelListTimeoutId = null;
         this.modelListLoading = false;
         this.modelListTimeoutMs = 15_000;
+        this.modelPickerReturnFocus = null;
         this.currentAiAbortController = null;
         this.currentAiAbortScope = '';
         this.activeChatRequest = null;
@@ -88,6 +97,8 @@ UIRegistry.register('style2', {
         this.apiProfilePersistTimerId = null;
         this.rangeRequestSeq = 0;
         this.exportRangeRequestSeq = 0;
+        this.exportRequestSeq = 0;
+        this.activeExportRequest = null;
         this.rangeMode = 'manual';
         this.exportRangeMode = 'manual';
         this.rangeBoundsTopicId = '';
@@ -110,6 +121,10 @@ UIRegistry.register('style2', {
     requestManagedFrame: UIRegistry.get('style1').requestManagedFrame,
     cancelManagedFrame: UIRegistry.get('style1').cancelManagedFrame,
     createFrameThrottledHandler: UIRegistry.get('style1').createFrameThrottledHandler,
+    getStreamingRenderDelay: UIRegistry.get('style1').getStreamingRenderDelay,
+    syncVisualViewport: UIRegistry.get('style1').syncVisualViewport,
+    resizeChatInput: UIRegistry.get('style1').resizeChatInput,
+    scheduleChatInputResize: UIRegistry.get('style1').scheduleChatInputResize,
     scheduleSummaryRender: UIRegistry.get('style1').scheduleSummaryRender,
     cancelSummaryRender: UIRegistry.get('style1').cancelSummaryRender,
     scheduleBubbleRender: UIRegistry.get('style1').scheduleBubbleRender,
@@ -235,7 +250,7 @@ UIRegistry.register('style2', {
                              </div>
                              <div class="chat-input-area">
                                  <div class="chat-input-row">
-                                     <textarea id="chat-input" class="chat-input" placeholder="输入你的问题... (Enter 发送)" rows="1" aria-label="对话输入"></textarea>
+                                     <textarea id="chat-input" class="chat-input" placeholder="输入你的问题... (Enter 发送)" enterkeyhint="send" rows="1" aria-label="对话输入"></textarea>
                                      <button type="button" class="send-btn" id="btn-send" title="发送消息" aria-label="发送消息">${this.ICONS.send}</button>
                                  </div>
                              </div>
@@ -372,33 +387,6 @@ UIRegistry.register('style2', {
     getSummarySelectionMenuHtml: UIRegistry.get('style1').getSummarySelectionMenuHtml,
     bindEvents() {
         UIRegistry.get('style1').bindEvents.call(this);
-        const Q = this.uiManager.Q.bind(this.uiManager);
-        const tabBar = Q('.tab-bar');
-        const toggleButton = Q('#toggle-btn');
-
-        this.addManagedListener(tabBar, 'keydown', (event) => {
-            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-            const tabs = Array.from(tabBar.querySelectorAll('[role="tab"]'));
-            const currentIndex = Math.max(0, tabs.indexOf(event.target.closest?.('[role="tab"]')));
-            let nextIndex = currentIndex;
-            if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
-            if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % tabs.length;
-            if (event.key === 'Home') nextIndex = 0;
-            if (event.key === 'End') nextIndex = tabs.length - 1;
-            const nextTab = tabs[nextIndex];
-            if (!nextTab) return;
-            event.preventDefault();
-            this.switchTab(nextTab.dataset.tab);
-            nextTab.focus();
-        });
-
-        this.addManagedListener(toggleButton, 'click', (event) => {
-            if (event.detail === 0) this.toggleSidebar();
-        });
-
-        this.addManagedListener(window, 'resize', this.createFrameThrottledHandler(() => {
-            this.applyResponsiveLayout();
-        }));
         this.applyResponsiveLayout();
     },
     bindKeyboardShortcuts: UIRegistry.get('style1').bindKeyboardShortcuts,
@@ -453,12 +441,14 @@ UIRegistry.register('style2', {
         this.applyResponsiveLayout();
     },
     isNarrowViewport() {
-        return window.innerWidth <= 700;
+        const visualWidth = Number(window.visualViewport?.width) || window.innerWidth;
+        return Math.min(window.innerWidth, visualWidth) <= 700;
     },
     getEffectiveSidebarWidth() {
         const savedWidth = Number(this.sidebarWidth) || 420;
-        if (this.isNarrowViewport()) return window.innerWidth;
-        const viewportLimit = Math.max(360, window.innerWidth - 48);
+        const viewportWidth = Math.min(window.innerWidth, Number(window.visualViewport?.width) || window.innerWidth);
+        if (this.isNarrowViewport()) return viewportWidth;
+        const viewportLimit = Math.max(360, viewportWidth - 48);
         return Math.min(700, viewportLimit, Math.max(360, savedWidth));
     },
     applyResponsiveLayout() {
@@ -712,6 +702,10 @@ UIRegistry.register('style2', {
     forceScrollSummaryToBottom: UIRegistry.get('style1').forceScrollSummaryToBottom,
     clearChat: UIRegistry.get('style1').clearChat,
     updateMessageCount: UIRegistry.get('style1').updateMessageCount,
+    beginExportRequest: UIRegistry.get('style1').beginExportRequest,
+    isCurrentExportRequest: UIRegistry.get('style1').isCurrentExportRequest,
+    abortActiveExportRequest: UIRegistry.get('style1').abortActiveExportRequest,
+    finalizeExportRequest: UIRegistry.get('style1').finalizeExportRequest,
     setExportRange: UIRegistry.get('style1').setExportRange,
     doExport: UIRegistry.get('style1').doExport,
     exportAsHtml: UIRegistry.get('style1').exportAsHtml,

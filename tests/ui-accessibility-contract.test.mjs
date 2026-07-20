@@ -4,6 +4,7 @@ import test from 'node:test';
 
 import { style1Interactions } from '../src/ui/style1/interactions.js';
 import { style1Lifecycle } from '../src/ui/style1/lifecycle.js';
+import { style1Helpers } from '../src/ui/style1/helpers.js';
 
 const [style1PresentationSource, style1EventsSource, style1StateSource, style2Source, style2PresentationSource] = await Promise.all([
     readFile(new URL('../src/ui/style1/presentation.js', import.meta.url), 'utf8'),
@@ -83,6 +84,26 @@ test('both themes render semantic tabs and keyboard navigation remains shared', 
     assert.match(style1StateSource, /panel\.hidden\s*=\s*!active/);
 });
 
+test('chat input, model picker, and visual viewport use managed compatibility paths', () => {
+    assert.match(style1EventsSource, /e\.isComposing/);
+    assert.match(style1EventsSource, /e\.keyCode === 229/);
+    assert.doesNotMatch(style1EventsSource, /Q\('#chat-input'\)\.addEventListener/);
+    assert.match(style1EventsSource, /addManagedListener\(chatInput, 'input'/);
+    assert.match(style1EventsSource, /window\.visualViewport/);
+    assert.match(style1EventsSource, /addManagedListener\(window\.visualViewport, 'resize'/);
+    assert.doesNotMatch(style1EventsSource, /addManagedListener\(window\.visualViewport, 'scroll'/);
+
+    const openModelPicker = style1Helpers.openModelPicker.toString();
+    const closeModelPicker = style1Helpers.closeModelPicker.toString();
+    assert.match(openModelPicker, /modelPickerReturnFocus/);
+    assert.match(openModelPicker, /requestManagedFrame/);
+    assert.match(openModelPicker, /\.focus\(\)/);
+    assert.match(closeModelPicker, /restoreFocus/);
+    assert.match(closeModelPicker, /returnFocus\?\.isConnected/);
+    assert.match(style1EventsSource, /modelPickerModal, 'keydown'/);
+    assert.match(style1EventsSource, /modelPickerModal\.getRootNode\(\)\.activeElement/);
+});
+
 test('both themes expose accessible workspace source and replacement confirmation surfaces', () => {
     for (const source of [style1PresentationSource, style2Source]) {
         assert.match(source, /id="workspace-source-status-summary"[^>]*role="status"[^>]*hidden/);
@@ -106,7 +127,8 @@ test('both themes expose accessible workspace source and replacement confirmatio
 });
 
 test('Style2 provides a no-squeeze narrow fallback and reduced-motion contract', () => {
-    assert.match(style2Source, /window\.innerWidth\s*<=\s*700/);
+    assert.match(style2Source, /window\.visualViewport\?\.width/);
+    assert.match(style2Source, /Math\.min\(window\.innerWidth, visualWidth\)\s*<=\s*700/);
     assert.match(style2Source, /classList\.toggle\(['"]narrow-viewport['"]/);
     assert.match(style2Source, /if\s*\(!active\s*\|\|\s*this\.isNarrowViewport\(\)\)/);
     assert.match(style2Source, /body\.style\.marginLeft\s*=\s*['"]/);

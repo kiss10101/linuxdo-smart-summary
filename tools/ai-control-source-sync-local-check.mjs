@@ -76,9 +76,34 @@ for (const [start, end, label] of [
   [/async fetchTopicPosts\(topicId, start, end, onProgress, options = \{\}\)\s*\{/, /\n\s*formatPostForAiContext\(/, 'fetchTopicPosts block']
 ]) {
   const block = getBlock(distText, start, end, label);
-  assertNotContains(block, 'signal:', `${label}: no abort signal in Linux.do fetch chain`);
   assertNotContains(block, 'AbortController', `${label}: no abort controller in Linux.do fetch chain`);
 }
+
+const topicFetchBlock = getBlock(
+  distText,
+  /async fetchTopicPosts\(topicId, start, end, onProgress, options = \{\}\)\s*\{/,
+  /\n\s*formatPostForAiContext\(/,
+  'fetchTopicPosts block'
+);
+assertContains(topicFetchBlock, 'getLinuxDoFetchOptions({ signal: options.signal })', 'export signal enters Linux.do fetch chain');
+assertContains(topicFetchBlock, 'throwIfAborted?.(options.signal)', 'export signal is checked before Linux.do work');
+
+const summaryBlockForLinuxDoGuard = getBlock(
+  distText,
+  /async doSummary\(\)\s*\{/,
+  /\n\s*async doChat\(\)\s*\{/,
+  'doSummary Linux.do guard block'
+);
+const linuxDoFetchEnd = summaryBlockForLinuxDoGuard.indexOf('await Core.fetchDialoguesCached');
+const aiAbortStart = summaryBlockForLinuxDoGuard.indexOf("this.startAiAbortController('summary')");
+if (linuxDoFetchEnd < 0 || aiAbortStart < 0 || linuxDoFetchEnd > aiAbortStart) {
+  throw new Error('summary Linux.do fetch must complete before the AI-only abort controller starts');
+}
+assertNotContains(
+  summaryBlockForLinuxDoGuard.slice(0, aiAbortStart),
+  'abortController.signal',
+  'AI-only summary stop must not cancel Linux.do fetches'
+);
 
 const chatBlock = getBlock(
   distText,

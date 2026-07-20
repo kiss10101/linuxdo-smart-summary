@@ -1,5 +1,14 @@
 # Changelog
 
+## 7.8.0-beta.1
+
+- Promotes the completed `7.8.0` alpha feature line into compatibility and defect closure without adding user-facing features, storage migrations, provider schema changes, or background Linux.do requests.
+- Reduces streaming-answer work by using escaped plain-text previews until completion, adapting render cadence for long output, mutating only the active assistant message, and coalescing scroll work.
+- Improves browser compatibility with IME-safe send handling, visual-viewport sizing, keyboard focus containment and restoration for model selection, and deterministic teardown of requests, animation frames, listeners, render tasks, and retained UI data.
+- Bounds transient resource use with count and byte budgets for topic and prewarm caches, plus cancellable, time-bounded offline image embedding with per-image and aggregate encoded-size limits, duplicate-URL reuse, and remote-URL fallback.
+- Isolates abortable topic/export requests from shared in-flight metadata work so cancellation cannot poison another consumer, while preserving the existing serial Linux.do post-fetch cadence.
+- Expands source coverage to 80 tests across streaming lifecycle, request races, cache budgets, export limits, visual viewport behavior, focus management, teardown, accessibility, and generated-release contracts.
+
 ## 7.8.0-alpha.4
 
 - Preserves the current summary and follow-up conversation when Linux.do navigates directly between topic routes without a full page reload, including browser back/forward navigation to the source topic.

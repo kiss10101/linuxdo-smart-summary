@@ -49,10 +49,12 @@ const installTopicRouteBootstrap = () => {
     if (uiRuntime.routeBootstrapCleanup) return;
 
     let scheduled = false;
+    let bootCheckTimerId = null;
     const scheduleBootCheck = () => {
         if (scheduled) return;
         scheduled = true;
-        setTimeout(() => {
+        bootCheckTimerId = setTimeout(() => {
+            bootCheckTimerId = null;
             scheduled = false;
             syncTopicPageUi();
         }, 0);
@@ -85,6 +87,9 @@ const installTopicRouteBootstrap = () => {
 
     uiRuntime.routeBootstrapCleanup = () => {
         clearActiveTopicPrewarmTimer();
+        if (bootCheckTimerId) clearTimeout(bootCheckTimerId);
+        bootCheckTimerId = null;
+        scheduled = false;
         if (history.pushState === patchedPushState) history.pushState = originalPushState;
         if (history.replaceState === patchedReplaceState) history.replaceState = originalReplaceState;
         window.removeEventListener('popstate', scheduleBootCheck);

@@ -79,7 +79,9 @@ export const style1State = {
     },
 
     isNarrowViewport(maxWidth = 700) {
-        return typeof window !== 'undefined' && window.innerWidth <= maxWidth;
+        if (typeof window === 'undefined') return false;
+        const visualWidth = Number(window.visualViewport?.width) || window.innerWidth;
+        return Math.min(window.innerWidth, visualWidth) <= maxWidth;
     },
 
     updateButtonPosition(useTransition = true) {
